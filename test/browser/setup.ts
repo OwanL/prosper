@@ -46,23 +46,34 @@ export default async function setup() {
     rmSync(directory, { recursive: true, force: true });
   };
   try {
-    const deadline = Date.now() + 20000;
+    // Cold dependency optimization and Windows file scanning can exceed a warm start.
+    const deadline = Date.now() + 60000;
+    let lastStatus = 'No response received';
     while (Date.now() < deadline) {
       if (failure) throw failure;
       if (child.exitCode !== null) throw new Error(`Dev supervisor exited: ${child.exitCode}`);
       try {
         const response = await fetch('http://127.0.0.1:5173/api/state', {
-          signal: AbortSignal.timeout(1000),
+          signal: AbortSignal.timeout(3000),
         });
         const snapshot = await response.json();
-        if (response.ok && snapshot.status.state === 'ready' && snapshot.status.mode === 'scripted')
+        lastStatus = JSON.stringify({
+          http: response.status,
+          status: snapshot.status,
+          error: snapshot.error,
+        });
+        if (
+          response.ok &&
+          snapshot.status?.state === 'ready' &&
+          snapshot.status.mode === 'scripted'
+        )
           return cleanup;
-      } catch {
-        /* Starting; bounded by deadline. */
+      } catch (error) {
+        lastStatus = error instanceof Error ? error.message : String(error);
       }
-      await delay(100);
+      await delay(200);
     }
-    throw new Error('Scripted dev server did not become ready.');
+    throw new Error(`Scripted dev server did not become ready: ${lastStatus}`);
   } catch (error) {
     await cleanup();
     throw error;

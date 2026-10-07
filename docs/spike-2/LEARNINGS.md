@@ -28,6 +28,7 @@ The first spike and its original designs are preserved in commit `da9425f` on `s
 3. **Historical citizens are not permanent corpses.** Keeping dead citizens for history initially left a second visible entity after loot collection. Living projections and separate body/loot records now reflect disappearance correctly while retaining dossiers.
 4. **Noncooperative requests need a local deadline.** An ignored abort or hung provider must not occupy every citizen reasoning slot forever. Deadline tests cover slot release and late-response rejection without stopping the world.
 5. **SVG browser focus behavior matters.** Chromium's default large SVG focus outline obscured the scene. Explicit keyboard focus styling retains accessibility without covering the map.
+6. **Cold startup differs from a warm test run.** Dependency recompilation exposed a 20-second browser readiness timeout. The harness now allows a bounded 60-second cold start and retains the last readiness/error response rather than hiding the diagnostic. Browser acceptance passed after this change.
 
 ### Evidence collected
 
