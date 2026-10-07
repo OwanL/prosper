@@ -1,0 +1,30 @@
+import { test, expect } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('keyboard character selection and reduced-motion mobile layout', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await expect(page.getByTestId('prosper-app')).toHaveAttribute('data-app-state', 'ready');
+  await expect(page.getByTestId('planner-mode')).toContainText('SCRIPTED');
+  const character = page.locator('.world-scene .citizen').first();
+  const id = await character.getAttribute('data-entity-id');
+  await character.focus();
+  await character.press('Enter');
+  await expect(page.getByTestId('citizen-inspector')).toHaveAttribute('data-citizen-id', id!);
+  await expect(character.locator('.focus-ring')).toHaveCSS('opacity', '1');
+  await expect(character).toHaveCSS('transition-duration', '0s');
+  await expect(character.locator('.arm')).toHaveCSS('animation-name', 'none');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('checkbox', { name: 'Compact panels', exact: true }).check();
+  await expect(page.getByTestId('prosper-app')).toHaveClass('app compact');
+  const directory = join(tmpdir(), 'prosper-browser-visual');
+  mkdirSync(directory, { recursive: true });
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.screenshot({ path: join(directory, 'mobile.png'), animations: 'disabled' });
+  expect(errors).toEqual([]);
+});
