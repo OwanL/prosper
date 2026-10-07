@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#18241f" />
+    <title>Prosper — Citizen Sandbox</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#main" aria-label="Prosper home"><span class="brand-mark" aria-hidden="true">✳</span>prosper</a>
+      <div class="top-meta"><span class="state-dot" id="header-state-dot"></span><span id="header-state-label">Connecting…</span><span id="tick-label">Tick —</span><span id="population-label">— citizens</span><span id="budget-mini"></span></div>
+      <nav class="controls" aria-label="Simulation controls">
+        <button id="play-button" class="button primary" type="button">▶ Play</button>
+        <button id="pause-button" class="button" type="button">Ⅱ Pause</button>
+        <label class="speed-control">Speed <select id="speed-select" aria-label="Simulation speed"><option value="1">1×</option><option value="3">3×</option><option value="8">8×</option></select></label>
+        <button id="reset-button" class="button reset" type="button">↺ Reset</button>
+      </nav>
+    </header>
+    <main id="main" class="page-shell">
+      <div id="connection-banner" class="connection-banner" role="alert" hidden><span id="connection-message"></span><button id="retry-button" class="text-button" type="button" disabled>Retry planner</button></div>
+      <div id="dashboard" class="dashboard">
+      <div id="workspace" class="workspace">
+        <aside id="citizens-panel" class="citizens-panel panel" aria-labelledby="citizens-title">
+          <div class="section-heading"><h2 id="citizens-title">Citizens</h2><span id="citizen-count" class="count-pill">—</span></div>
+          <p class="observer-note">Spectator roster</p>
+          <div id="citizen-list" class="citizen-list"></div>
+          <details class="system-panel">
+            <summary>System &amp; planner</summary>
+            <div class="system-content system-grid">
+              <div><span class="system-label">Model</span><strong id="model-name">Connecting…</strong></div>
+              <div><span class="system-label">Connection</span><strong id="model-state-label">Checking</strong></div>
+              <div><span class="system-label">Food / wood gathered</span><strong id="resource-stats">0 / 0</strong></div>
+              <div><span class="system-label">Messages · crafts · trades/gifts</span><strong id="activity-stats">0 · 0 · 0</strong></div>
+              <div><span class="system-label">Births · deaths · attacks</span><strong id="life-stats">0 · 0 · 0</strong></div>
+              <div><span class="system-label">Buildings &amp; bread</span><strong id="building-stats">—</strong></div>
+              <div><span class="system-label">Planning</span><strong id="planner-stats">—</strong></div>
+              <div><span class="system-label">Budget</span><strong id="budget-stats">—</strong><div id="budget-meter" class="budget-meter"><span id="budget-meter-fill"></span></div></div>
+              <div><span class="system-label">Call spacing</span><strong id="planner-cooldown">—</strong></div>
+            </div>
+            <pre id="planner-error" class="diagnostic-copy">No planner errors.</pre>
+            <details class="secondary-details"><summary>World event log</summary><ol id="event-list" class="feed-list event-list"></ol><p id="events-empty" class="empty-copy">No events yet.</p></details>
+          </details>
+        </aside>
+        <section id="map-panel" class="map-panel panel" aria-labelledby="world-title">
+          <div class="map-heading"><div><p class="eyebrow">THE SETTLEMENT <span id="world-clock"></span></p><h1 id="world-title">World map</h1></div><div class="map-modes" role="group" aria-label="Map information view"><button id="overview-mode" type="button" aria-pressed="true">Overview</button><button id="citizen-mode" type="button" aria-pressed="false">Citizen view</button></div></div>
+          <p class="view-note" id="map-view-note">Spectator overview · world data</p>
+          <p class="view-note" id="map-geography">Center L3 → Ring 1 L2 → Ring 2 L1 · three tiers; quality changes yield only.</p>
+          <div class="map-wrap"><div id="map-board" class="map-board" role="group" aria-label="World map">
+            <div id="tile-field" class="tile-field" aria-hidden="true"></div><svg id="map-overlay" class="map-overlay" aria-hidden="true" focusable="false"></svg>
+            <div id="resource-layer" class="resource-layer" aria-label="Resources"></div><div id="building-layer" class="building-layer" aria-label="Buildings"></div><div id="citizen-layer" class="citizen-layer" aria-label="Citizens"></div><div id="action-layer" class="action-layer" aria-hidden="true"></div>
+          </div></div>
+          <div class="map-footer"><div class="legend" aria-label="Map legend"><span>✳ Food</span><span>♣ Trees</span><span>L1–3 Quality</span><span>⌂ Bakery</span><span>▥ Wall</span><span>▵ House</span><span>● Citizen</span><span>┄ Route</span><span>◌ Regenerating</span></div><span id="map-hint" class="map-hint">Select a citizen to inspect</span></div>
+        </section>
+        <aside id="inspector-panel" class="inspector-panel panel" aria-labelledby="inspector-title">
+          <div class="section-heading"><div><p class="eyebrow">INSPECTOR</p><h2 id="inspector-title">Select a citizen</h2></div><span id="planning-chip" class="status-chip" hidden>Planning</span></div>
+          <div id="inspector-content" class="inspector-content"><p class="empty-copy">Citizen details will appear here.</p></div>
+        </aside>
+      </div>
+      <section id="communications-panel" class="communications-panel panel" aria-label="Settlement communications">
+        <section id="trades-feed" class="communication-column" aria-labelledby="trades-title">
+          <div class="section-heading"><h2 id="trades-title">Trades</h2><span id="trades-count" class="quiet"></span></div>
+          <p class="view-note">Offers and exchanges · newest first</p>
+          <div id="trades-list" class="communications-list" role="list" aria-label="Trade offers and outcomes"></div>
+          <p id="trades-empty" class="empty-copy">No trade offers yet.</p>
+        </section>
+        <section id="private-feed" class="communication-column" aria-labelledby="private-title">
+          <div class="section-heading"><h2 id="private-title">Private messages</h2><span id="private-count" class="quiet"></span></div>
+          <p class="view-note">Conversations and family updates · spectator view</p>
+          <div id="private-list" class="communications-list" role="list" aria-label="Private messages and family updates"></div>
+          <p id="private-empty" class="empty-copy">No private messages yet.</p>
+        </section>
+        <section id="public-feed" class="communication-column" aria-labelledby="public-title">
+          <div class="section-heading"><h2 id="public-title">Public messages</h2><span id="public-count" class="quiet"></span></div>
+          <p class="view-note">The public noticeboard · newest first</p>
+          <div id="public-list" class="communications-list" role="list" aria-label="Public messages"></div>
+          <p id="public-empty" class="empty-copy">No public messages yet.</p>
+        </section>
+      </section>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "prosper-spike",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "experiment": "node scripts/compare-planners.mjs",
+    "resume": "node scripts/resume-run.mjs",
+    "build:ui": "esbuild ui/app.js --bundle --format=esm --outfile=public/app.js",
+    "predev": "npm run build:ui",
+    "dev": "node --watch server.mjs",
+    "prestart": "npm run build:ui",
+    "start": "node server.mjs",
+    "pretest": "npm run build:ui",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "split.js": "1.6.5"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
