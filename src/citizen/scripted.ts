@@ -1,5 +1,8 @@
-import type { CitizenObservation, Command, EquipmentKind, Resource } from '../shared/types.ts';
-const recipes: { item: EquipmentKind; ingredients: Resource[] }[] = [
+import type { CitizenObservation, Command, ToolKind, Resource } from '../shared/types.ts';
+import { highestToolTier } from '../shared/tool-utils.ts';
+import { MAX_TIER, TIERS } from '../shared/tiers.ts';
+import { equipmentRecipe } from '../world/config.ts';
+const recipes: { item: ToolKind; ingredients: Resource[] }[] = [
   { item: 'knife', ingredients: ['wood', 'fibre'] },
   { item: 'axe', ingredients: ['food', 'fibre'] },
   { item: 'scythe', ingredients: ['wood', 'food'] },
@@ -8,22 +11,16 @@ const matching = { food: 'knife', wood: 'axe', fibre: 'scythe' } as const;
 /** Mechanical demonstration only. No personality/emergence evaluation. */
 export function scriptedCommands(observation: CitizenObservation): Command[] {
   const citizen = observation.citizen;
-  if (citizen.action || citizen.queue.length) return []; // never reset unfinished physical work
+  if (citizen.action || citizen.queue.length || citizen.plan) return []; // never reset approved work
   const amount = (kind: string, tier: number) => citizen.inventory[`${kind}:${tier}`] ?? 0;
-  for (const { item } of recipes) {
-    for (const tier of [3, 2, 1]) {
-      if (amount(item, tier) && Number(citizen.equipment[item]?.split(':')[1] ?? 0) < tier)
-        return [{ type: 'equip', item: `${item}:${tier}` }];
-    }
-  }
   let wantedTier = 1;
   let wanted: Resource[] = citizen.fullness < 60 && !amount('food', 1) ? ['food'] : [];
   if (!wanted.length) {
-    for (const tier of [1, 2, 3] as const) {
+    for (const tier of TIERS) {
       const missing = recipes.find((recipe) => !amount(recipe.item, tier));
       if (!missing) continue;
       wantedTier = tier;
-      wanted = missing.ingredients.filter((resource) => amount(resource, tier) < 3);
+      wanted = missing.ingredients.filter((resource) => amount(resource, tier) < equipmentRecipe(missing.item, tier)[`${resource}:${tier}`]);
       if (!wanted.length) return [{ type: 'craft', item: missing.item, tier }];
       break;
     }
@@ -33,12 +30,12 @@ export function scriptedCommands(observation: CitizenObservation): Command[] {
   const deposits = known
     .flatMap((tile) => tile.deposits)
     .filter((deposit) => {
-      const toolTier = Number(citizen.equipment[matching[deposit.resource]]?.split(':')[1] ?? 0);
+      const toolTier = highestToolTier(citizen, matching[deposit.resource]);
       return (
         wanted.includes(deposit.resource) &&
         deposit.stock > 0 &&
         deposit.tier === wantedTier &&
-        deposit.tier <= Math.min(3, toolTier + 1)
+        deposit.tier <= Math.min(MAX_TIER, toolTier + 1)
       );
     })
     .sort(

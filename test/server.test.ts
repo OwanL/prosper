@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
-import { Runtime } from '../src/server/runtime.ts';
+import { Runtime, type RuntimeOptions } from '../src/server/runtime.ts';
 import { createApiServer } from '../src/server/http.ts';
 import { dataDirectory } from '../src/server/checkpoint.ts';
 
@@ -24,9 +24,9 @@ function directory() {
   directories.push(path);
   return path;
 }
-async function setup() {
+async function setup(options: Omit<RuntimeOptions, 'directory'> = {}) {
   const root = directory();
-  const runtime = new Runtime({ directory: root, autoClock: false });
+  const runtime = new Runtime({ ...options, directory: root, autoClock: false });
   runtimes.push(runtime);
   const server = createApiServer({ runtime, dist: root });
   servers.push(server);
@@ -47,6 +47,105 @@ async function setup() {
 }
 
 describe('native browser API', () => {
+  it('creates a 100-citizen local world explicitly without opening model calls', async () => {
+    const { post, runtime } = await setup();
+    const result = await post('/api/control', {
+      type: 'scenario',
+      scenario: 'competition',
+      population: 100,
+    });
+    expect(result.status).toBe(200);
+    expect(Object.keys(runtime.world.citizens)).toHaveLength(100);
+    expect(Object.values(runtime.world.citizens).every((citizen) => !!citizen.autonomy)).toBe(true);
+    expect(runtime.snapshot().budget.requests).toBe(0);
+    expect((await post('/api/control', { type: 'play', population: 100 })).status).toBe(400);
+    expect(
+      (await post('/api/control', { type: 'scenario', scenario: 'competition', population: 251 }))
+        .status,
+    ).toBe(400);
+  });
+  it('validates explicit total budget edits and retains caps and spending across paused restore/scenario', async () => {
+    const transport = async () => ({ content: 'done', usage: { inputTokens: 5, outputTokens: 2 } });
+    const { root, runtime, post } = await setup({ runner: { transport } });
+    const initialRun = runtime.world.runId;
+    const capped = await post('/api/budget', { maxRequests: 0, maxTokens: 100_000 });
+    expect(capped).toMatchObject({
+      status: 200,
+      body: {
+        budget: { limit: 0, tokens: 0, maxTokens: 100_000, blocked: { reason: 'requests' } },
+      },
+    });
+    await post('/api/control', { type: 'mode', mode: 'live' });
+    const citizenId = Object.keys(runtime.world.citizens)[0];
+    await runtime.runner.startTurn(citizenId);
+    expect(runtime.runner.records()).toEqual([]);
+    const increased = await post('/api/budget', { maxRequests: 1, maxTokens: 1_000_000 });
+    expect(increased.body.status).toMatchObject({ running: false, mode: 'live' });
+    expect(increased.body.budget.blocked).toBeUndefined();
+    await runtime.runner.startTurn(citizenId);
+    expect(runtime.snapshot().budget).toMatchObject({
+      requests: 1,
+      tokens: 7,
+      blocked: { reason: 'requests' },
+    });
+    const ledgerText = readFileSync(join(root, 'request-ledger.jsonl'), 'utf8');
+    const settingsText = readFileSync(join(root, 'budget-settings.jsonl'), 'utf8');
+    for (const value of [
+      { maxRequests: -1, maxTokens: 10 },
+      { maxRequests: 2, maxTokens: 0.5 },
+      { maxRequests: 2 },
+      { maxRequests: '2', maxTokens: 10 },
+      { maxRequests: Number.MAX_SAFE_INTEGER + 1, maxTokens: 10 },
+      { maxRequests: 2, maxTokens: 10, reset: true },
+    ])
+      expect((await post('/api/budget', value)).status).toBe(400);
+    expect(readFileSync(join(root, 'budget-settings.jsonl'), 'utf8')).toBe(settingsText);
+    runtime.checkpoint(false);
+    runtime.close();
+    const restored = new Runtime({
+      directory: root,
+      restore: true,
+      autoClock: false,
+      runner: {
+        transport,
+        minRequestIntervalMs: 0,
+        minRequestIntervalTicks: 0,
+        ledgerOptions: { maxRequests: 999, maxTokens: 999_999_999 },
+      },
+    });
+    runtimes.push(restored);
+    expect(restored.snapshot()).toMatchObject({
+      world: { runId: initialRun, tick: 0 },
+      status: { running: false, mode: 'live' },
+      budget: {
+        requests: 1,
+        pending: 0,
+        tokens: 7,
+        limit: 1,
+        maxTokens: 1_000_000,
+        blocked: { reason: 'requests' },
+      },
+    });
+    await restored.runner.startTurn(citizenId);
+    expect(restored.runner.records()).toEqual([]);
+    expect(restored.control({ type: 'scenario', scenario: 'progression' }).budget).toMatchObject({
+      requests: 1,
+      tokens: 7,
+      limit: 1,
+      maxTokens: 1_000_000,
+    });
+    expect(readFileSync(join(root, 'request-ledger.jsonl'), 'utf8')).toBe(ledgerText);
+    expect(
+      restored.updateBudget({ maxRequests: 2, maxTokens: 1_000_000 }).budget.blocked,
+    ).toBeUndefined();
+    restored.control({ type: 'mode', mode: 'live' });
+    await restored.runner.startTurn(Object.keys(restored.world.citizens)[0]);
+    expect(restored.snapshot().budget).toMatchObject({
+      requests: 2,
+      tokens: 14,
+      blocked: { reason: 'requests' },
+    });
+  });
   it('defaults to paused scripted, controls ticks and serializes validated commands', async () => {
     const { get, post, runtime, root } = await setup();
     expect(await get('/api/health')).toMatchObject({ ready: true, state: 'ready', tick: 0 });

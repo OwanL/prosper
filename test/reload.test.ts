@@ -21,7 +21,7 @@ function directory() {
   return path;
 }
 function runtime(options: ConstructorParameters<typeof Runtime>[0]) {
-  const value = new Runtime(options);
+  const value = new Runtime({ ...options, runner: { contextMode: 'legacy', ...options?.runner } });
   runtimes.push(value);
   return value;
 }
@@ -68,6 +68,18 @@ const call = (id: string, command: unknown): ProviderResponse => ({
 });
 
 describe('versioned consistent reload', () => {
+  it('retains acknowledged planning alerts and accepts older checkpoints without them', () => {
+    const root = directory();
+    const old = runtime({ directory: root, autoClock: false });
+    const citizen = Object.values(old.world.citizens)[0];
+    citizen.review = { eventSequence: old.world.nextId - 1, foodRisk: 1 };
+    const cp = old.checkpoint(false);
+    const restored = runtime({ directory: root, restore: true, autoClock: false });
+    expect(restored.world.citizens[citizen.id].review).toEqual(citizen.review);
+    const legacy = structuredClone(cp);
+    delete legacy.world.citizens[citizen.id].review;
+    expect(() => validateCheckpoint(legacy)).not.toThrow();
+  });
   it('preserves committed work/reservations/RNG/schedule, aborts a noncooperative provider and rejects late effects', async () => {
     const root = directory();
     const pending = deferred<ProviderResponse>();
@@ -78,7 +90,12 @@ describe('versioned consistent reload', () => {
       runner: {
         transport: async () =>
           ++requests === 1
-            ? call('committed', { type: 'remember', text: 'before reload' })
+            ? {
+                toolCalls: [
+                  ...call('committed', { type: 'remember', text: 'before reload' }).toolCalls!,
+                  { id: 'detail', name: 'query_tile', arguments: '{"x":1,"y":1}' },
+                ],
+              }
             : pending.promise,
         ledgerOptions: { maxTokens: 1_000_000 },
       },

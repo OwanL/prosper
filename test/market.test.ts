@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_TIER, TIERS } from '../src/shared/tiers.ts';
 import type { Action, Citizen, Command, World } from '../src/shared/types.ts';
 import {
   cancelBuildingOrders,
@@ -20,7 +21,6 @@ function citizen(id: string): Citizen {
     fullness: 100,
     gold: 100,
     inventory: {},
-    equipment: {},
     action: null,
     queue: [],
     goals: [],
@@ -92,6 +92,23 @@ function refine(w: World) {
 }
 
 describe('market escrow and settlement', () => {
+  it('settles remotely outside sight with no meetup, travel or world ticks', () => {
+    const w = fixture();
+    w.citizens.b.x = 9;
+    w.citizens.b.y = 9;
+    w.citizens.a.inventory['wood:1'] = 3;
+    expect(place(w, 'a', 'sell', 3, 2).ok).toBe(true);
+    expect(place(w, 'b', 'buy', 3, 2).ok).toBe(true);
+    expect(w.citizens.b.inventory['wood:1']).toBe(3);
+    expect(w.citizens.a.gold).toBe(106);
+    expect(w.citizens.b.gold).toBe(94);
+    expect(w.citizens.a).toMatchObject({ x: 0, y: 0, action: null });
+    expect(w.citizens.b).toMatchObject({ x: 9, y: 9, action: null });
+    expect(w.tick).toBe(0);
+    expect(w.orders).toEqual({});
+    expect(gold(w)).toBe(w.initialGold);
+  });
+
   it('partially fills at resting sell price and immediately refunds excess buy gold', () => {
     const w = fixture();
     w.citizens.a.inventory['wood:1'] = 5;
@@ -218,13 +235,13 @@ describe('unique building assets', () => {
 });
 
 describe('validation and available holdings', () => {
-  it('sells spare equipment but not the equipped unit or escrowed units', () => {
+  it('sells every carried tool copy but not escrowed units', () => {
     const w = fixture();
     w.citizens.a.inventory['axe:1'] = 2;
-    w.citizens.a.equipment.axe = 'axe:1';
     expect(place(w, 'a', 'sell', 1, 10, 'axe:1').ok).toBe(true);
-    expect(place(w, 'a', 'sell', 1, 10, 'axe:1').ok).toBe(false);
-    expect(w.citizens.a.inventory['axe:1']).toBe(1);
+    expect(place(w, 'a', 'sell', 1, 11, 'axe:1').ok).toBe(true);
+    expect(place(w, 'a', 'sell', 1, 12, 'axe:1').ok).toBe(false);
+    expect(w.citizens.a.inventory['axe:1']).toBeUndefined();
     cancelCitizenOrders(w, 'a');
     expect(w.citizens.a.inventory['axe:1']).toBe(2);
   });
@@ -246,9 +263,23 @@ describe('validation and available holdings', () => {
       expect(JSON.stringify(w)).toBe(before);
     },
   );
+  it.each(TIERS)('trades and refunds carried items at tier %i', (tier) => {
+    const w = fixture();
+    for (const kind of ['wood', 'food', 'fibre', 'axe', 'scythe', 'knife', 'sword']) {
+      const item = `${kind}:${tier}`;
+      w.citizens.a.inventory[item] = 2;
+      expect(place(w, 'a', 'sell', 2, 3, item).ok).toBe(true);
+      expect(place(w, 'b', 'buy', 1, 3, item).ok).toBe(true);
+      expect(w.citizens.b.inventory[item]).toBe(1);
+      cancelCitizenOrders(w, 'a');
+      expect(w.citizens.a.inventory[item]).toBe(1);
+      expect(gold(w)).toBe(300);
+    }
+    expect(w.orders).toEqual({});
+  });
   it('rejects unknown items, unsafe totals and unfunded orders', () => {
     const w = fixture();
-    for (const item of ['food:4', 'gold:1', 'citizen:a', 'wood', 'building:missing']) {
+    for (const item of [`food:${MAX_TIER + 1}`, 'gold:1', 'citizen:a', 'wood', 'building:missing']) {
       expect(place(w, 'a', 'buy', 1, 1, item).ok).toBe(false);
     }
     expect(place(w, 'a', 'buy', 2, Number.MAX_SAFE_INTEGER).ok).toBe(false);

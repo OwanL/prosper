@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AppSnapshot, Command, CommandResult, Control, World } from '../shared/types.ts';
 import { createWorld, dispatch, tickWorld } from '../world/core.ts';
@@ -15,17 +15,36 @@ import {
 import { parseCommand } from '../citizen/tools.ts';
 import { validateResponse } from '../citizen/provider.ts';
 import { dataDirectory, loadCheckpoint, saveCheckpoint, type Checkpoint } from './checkpoint.ts';
+import { projectSpectatorWorld } from './snapshot.ts';
+import { BALANCE } from '../world/config.ts';
+import { ensureTelemetry, globalHistory, citizenHistory } from '../world/telemetry.ts';
+import type { GlobalHistory, CitizenHistory } from '../shared/telemetry-types.ts';
+import type { MotionSnapshot } from '../shared/motion-types.ts';
 
 export const controlSchema = z
   .object({
-    type: z.enum(['play', 'pause', 'step', 'speed', 'scenario', 'mode', 'checkpoint']),
+    type: z.enum(['play', 'pause', 'step', 'speed', 'scenario', 'mode', 'checkpoint', 'reset']),
     ticks: z.number().int().min(1).max(10000).optional(),
     speed: z.number().min(0.1).max(100).optional(),
     scenario: z.enum(['village', 'competition', 'progression']).optional(),
     mode: z.enum(['scripted', 'live', 'recorded']).optional(),
+    population: z.number().int().min(1).max(250).optional(),
+  })
+  .strict()
+  .refine(
+    (control) => control.population === undefined || ['scenario', 'reset'].includes(control.type),
+    'population applies only to an explicit scenario or reset.',
+  );
+export const budgetSchema = z
+  .object({
+    maxRequests: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    maxTokens: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   })
   .strict();
 export interface RuntimeOptions {
+  /** New runs use the continuous local mind; explicit mechanics fixtures may opt out. */
+  autonomy?: boolean;
+  population?: number;
   directory?: string;
   checkpointPath?: string;
   restore?: boolean;
@@ -67,12 +86,18 @@ export class Runtime {
   private clock?: ReturnType<typeof setTimeout>;
   private resumeWanted?: boolean;
   private readonly ledger: RequestLedger;
+  private readonly motionListeners = new Set<(snapshot: MotionSnapshot) => void>();
+  private readonly motionStreamId = randomUUID();
+  private lastMotionTickAt = performance.now();
+  private motionTickMs = 250;
 
   constructor(private readonly options: RuntimeOptions = {}) {
     this.directory = dataDirectory(options.directory);
     this.checkpointPath = options.checkpointPath ?? join(this.directory, 'checkpoint.json');
     const cp = options.restore ? loadCheckpoint(this.checkpointPath) : undefined; // never substitute an empty world
-    this.world = cp?.world ?? options.world ?? createWorld({ runId: `run-${randomUUID()}` });
+    this.world = cp?.world ?? options.world ?? this.freshWorld();
+    ensureTelemetry(this.world);
+    updateKnowledge(this.world);
     this.running = cp?.runtime.running ?? false;
     this.speed = cp?.runtime.speed ?? 1;
     this.commandSequence = cp?.runtime.commandSequence ?? 0;
@@ -87,6 +112,25 @@ export class Runtime {
       running: this.running,
     });
     this.schedule(); // rebase: first tick is a full new interval, never wall-clock catchup
+  }
+  private freshWorld(scenario?: string, seed?: number, population?: number): World {
+    const configuredPopulation =
+      population ??
+      this.options.population ??
+      (process.env.PROSPER_POPULATION ? Number(process.env.PROSPER_POPULATION) : undefined);
+    const world = createWorld({
+      scenario,
+      seed,
+      runId: `run-${randomUUID()}`,
+      autonomy: this.options.autonomy ?? true,
+      population: configuredPopulation,
+    });
+    const citizens = Object.values(world.citizens);
+    for (const [index, citizen] of citizens.entries())
+      if (citizen.autonomy)
+        citizen.nextReviewTick = world.tick + 600 + Math.floor((index * 4200) / citizens.length);
+    ensureTelemetry(world);
+    return world;
   }
   private makeRunner(mode: AppSnapshot['status']['mode']): CitizenRunner {
     const consumed = new Set<string>();
@@ -157,6 +201,7 @@ export class Runtime {
     this.state = 'error';
     this.error = error instanceof Error ? error.message : String(error);
     this.log({ type: 'runtime-error', error: this.error });
+    this.publishMotion();
   }
   private advance(count: number): void {
     for (let i = 0; i < count; i++) {
@@ -164,6 +209,10 @@ export class Runtime {
       updateKnowledge(this.world);
       this.log({ type: 'tick', order: this.commandSequence });
       this.runner.tick(); // intentionally not awaited
+      const now = performance.now();
+      this.motionTickMs = Math.max(1, now - this.lastMotionTickAt);
+      this.lastMotionTickAt = now;
+      this.publishMotion();
     }
   }
   private available(): void {
@@ -196,8 +245,49 @@ export class Runtime {
     updateKnowledge(this.world);
     return observe(this.world, citizenId);
   }
+  /** Per-tick poses preserve turns; full notebooks/turn transcripts never enter this feed. */
+  motionSnapshot(): MotionSnapshot {
+    return {
+      runId: this.world.runId,
+      streamId: this.motionStreamId,
+      tick: this.world.tick,
+      running: this.running && this.state === 'ready',
+      tickMs: Math.min(2000, this.motionTickMs),
+      frames: [{ tick: this.world.tick, at: performance.now(), citizens: Object.values(this.world.citizens).map(citizen => {
+        const action = citizen.action;
+        const next = action?.phase === 'travel' ? action.path[0] : undefined;
+        const adjacent = next && Math.abs(next.x - citizen.x) + Math.abs(next.y - citizen.y) === 1;
+        const fraction = adjacent && action ? Math.max(0, Math.min(1, action.elapsed / BALANCE.moveTicks)) : 0;
+        return {
+          id: citizen.id, alive: citizen.alive,
+          x: citizen.x + (adjacent ? (next.x - citizen.x) * fraction : 0),
+          y: citizen.y + (adjacent ? (next.y - citizen.y) * fraction : 0),
+          ...(action?.phase === 'work' ? { progress: Math.max(0, Math.min(1, action.elapsed / Math.max(1, action.duration))) } : {}),
+        };
+      }) }],
+    };
+  }
+  subscribeMotion(listener: (snapshot: MotionSnapshot) => void): () => void {
+    this.motionListeners.add(listener);
+    listener(this.motionSnapshot());
+    return () => { this.motionListeners.delete(listener); };
+  }
+  private publishMotion(): void {
+    if (!this.motionListeners.size) return;
+    const snapshot = this.motionSnapshot();
+    for (const listener of this.motionListeners) {
+      try { listener(snapshot); } catch { this.motionListeners.delete(listener); }
+    }
+  }
+  globalHistory(): GlobalHistory {
+    return globalHistory(this.world);
+  }
+  citizenHistory(citizenId: string): CitizenHistory {
+    if (!Object.hasOwn(this.world.citizens, citizenId)) throw new Error('Unknown citizen.');
+    return citizenHistory(this.world, citizenId);
+  }
   snapshot(): AppSnapshot {
-    updateKnowledge(this.world);
+    const budget = this.runner.budget();
     const status = this.runner.status();
     const error = this.error ?? status.error ?? this.diagnosticError;
     // Private complete records are retained in JSONL; browser inspector is bounded explicitly.
@@ -210,6 +300,8 @@ export class Runtime {
         tick: record.tick,
         generation: record.generation,
         status: record.status,
+        policyOutcome: record.policyOutcome,
+        stopReason: record.stopReason,
         reason: record.reason,
         observation:
           record.observation.length > 24000
@@ -222,18 +314,26 @@ export class Runtime {
         inputTokens: record.inputTokens,
         outputTokens: record.outputTokens,
       }));
-    return structuredClone({
-      world: this.world,
+    return {
+      world: projectSpectatorWorld(this.world),
       status: {
         ...status,
+        planner: this.runner.metrics(),
         running: this.running,
         speed: this.speed,
         state: this.state,
         ...(error ? { error } : {}),
       },
-      turns,
-      budget: this.ledger.status(),
-    });
+      turns: structuredClone(turns),
+      budget,
+    };
+  }
+  updateBudget(value: unknown): AppSnapshot {
+    this.available();
+    const limits = budgetSchema.parse(value);
+    this.ledger.setLimits(limits);
+    this.log({ type: 'budget-limits', ...limits });
+    return this.snapshot();
   }
   control(value: unknown): AppSnapshot {
     const control = controlSchema.parse(value) as Control;
@@ -245,6 +345,8 @@ export class Runtime {
     switch (control.type) {
       case 'play':
         this.running = true;
+        this.lastMotionTickAt = performance.now();
+        this.motionTickMs = 250 / this.speed;
         break;
       case 'pause':
         this.running = false;
@@ -259,12 +361,17 @@ export class Runtime {
       case 'speed':
         if (control.speed === undefined) throw new Error('speed is required.');
         this.speed = control.speed;
+        this.lastMotionTickAt = performance.now();
+        this.motionTickMs = 250 / this.speed;
+        break;
+      case 'reset':
+        this.resetWorld(control.population);
         break;
       case 'scenario':
         if (!control.scenario) throw new Error('scenario is required.');
         this.running = false;
         this.runner.interrupt('scenario changed');
-        this.world = createWorld({ scenario: control.scenario, runId: `run-${randomUUID()}` });
+        this.world = this.freshWorld(control.scenario, undefined, control.population);
         this.recorded = [];
         this.commandSequence = 0;
         this.runner = this.makeRunner('scripted');
@@ -278,7 +385,64 @@ export class Runtime {
         break;
     }
     this.schedule();
+    this.publishMotion();
     return this.snapshot();
+  }
+  /** Archive before replacing anything; a failed save leaves the original world paused. */
+  private resetWorld(population?: number): void {
+    this.running = false;
+    this.cancelClock();
+    this.runner.interrupt('world reset');
+    updateKnowledge(this.world);
+    const mode = this.runner.status().mode;
+    const archived: Checkpoint = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      world: structuredClone(this.world),
+      runtime: {
+        running: false,
+        speed: this.speed,
+        mode,
+        commandSequence: this.commandSequence,
+        recorded: structuredClone(this.recorded),
+      },
+    };
+    // Older checkpoints predate scenario metadata. Initial gold is conserved, unlike population.
+    const scenario =
+      this.world.scenario ??
+      (this.world.initialGold === 900
+        ? 'competition'
+        : this.world.initialGold === 300
+          ? 'progression'
+          : 'village');
+    const seed = (this.world.seed + randomInt(1, 0x1_0000_0000)) >>> 0;
+    const nextWorld = this.freshWorld(
+      scenario,
+      seed,
+      population ?? this.world.initialGold / BALANCE.startingGold,
+    );
+    updateKnowledge(nextWorld);
+    const nextMode = mode === 'recorded' ? 'scripted' : mode;
+    const archivePath = join(this.directory, 'checkpoints', `before-reset-${randomUUID()}.json`);
+    const writer = this.options.checkpointWriter ?? saveCheckpoint;
+    try {
+      writer(archivePath, archived);
+      writer(this.checkpointPath, {
+        ...archived,
+        world: nextWorld,
+        runtime: { ...archived.runtime, mode: nextMode, commandSequence: 0, recorded: [] },
+      });
+    } catch (error) {
+      this.log({ type: 'reset-failed', archivePath });
+      throw new Error(
+        `Reset failed; original world remains paused: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    this.world = nextWorld;
+    this.recorded = [];
+    this.commandSequence = 0;
+    this.runner = this.makeRunner(nextMode);
+    this.log({ type: 'reset', previousRunId: archived.world.runId, archivePath, scenario, seed });
   }
   importFixtures(value: unknown): AppSnapshot {
     this.available();
@@ -339,5 +503,7 @@ export class Runtime {
     this.running = false;
     this.cancelClock();
     this.runner.interrupt('runtime closed');
+    this.publishMotion();
+    this.motionListeners.clear();
   }
 }

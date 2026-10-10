@@ -9,5 +9,6 @@ coverage/
 dist/
 playwright-report/
 test-results/
+.experiments/
 .prosper-v2/
 .DS_Store

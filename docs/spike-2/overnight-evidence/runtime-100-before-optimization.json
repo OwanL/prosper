@@ -1,0 +1,267 @@
+{
+  "warmupMs": 321679.3495,
+  "stages": [
+    {
+      "speed": 1,
+      "elapsedMs": 7100.908400000015,
+      "fromTick": 3000,
+      "toTick": 3015,
+      "pollCount": 8,
+      "pollTicks": [
+        3001,
+        3003,
+        3005,
+        3006,
+        3008,
+        3010,
+        3012,
+        3014
+      ],
+      "pollBytes": [
+        2072757,
+        2074306,
+        2074273,
+        2075963,
+        2076832,
+        2078186,
+        2079766,
+        2080147
+      ],
+      "storyCards": 4,
+      "citizenNodes": 118,
+      "sceneNodes": 19704
+    },
+    {
+      "speed": 10,
+      "elapsedMs": 7669.051399999997,
+      "fromTick": 3015,
+      "toTick": 3043,
+      "pollCount": 7,
+      "pollTicks": [
+        3016,
+        3021,
+        3025,
+        3028,
+        3032,
+        3035,
+        3038
+      ],
+      "pollBytes": [
+        2078977,
+        2081284,
+        2082935,
+        2083944,
+        2084638,
+        2085565,
+        2085832
+      ],
+      "storyCards": 4,
+      "citizenNodes": 118,
+      "sceneNodes": 19712
+    },
+    {
+      "speed": 100,
+      "elapsedMs": 7786.975600000005,
+      "fromTick": 3043,
+      "toTick": 3073,
+      "pollCount": 7,
+      "pollTicks": [
+        3045,
+        3048,
+        3052,
+        3056,
+        3061,
+        3064,
+        3068
+      ],
+      "pollBytes": [
+        2088302,
+        2089817,
+        2090215,
+        2091614,
+        2091664,
+        2094974,
+        2094660
+      ],
+      "storyCards": 4,
+      "citizenNodes": 118,
+      "sceneNodes": 19708
+    }
+  ],
+  "polls": [
+    {
+      "tick": 3000,
+      "bytes": 2072042,
+      "elapsedMs": 389.90850000001956,
+      "receivedAt": 323734.2232
+    },
+    {
+      "tick": 3000,
+      "bytes": 2072042,
+      "elapsedMs": 142.65239999996265,
+      "receivedAt": 324367.9721
+    },
+    {
+      "tick": 3001,
+      "bytes": 2072757,
+      "elapsedMs": 421.0358000000124,
+      "receivedAt": 325461.9728
+    },
+    {
+      "tick": 3003,
+      "bytes": 2074306,
+      "elapsedMs": 183.92290000000503,
+      "receivedAt": 326048.3369
+    },
+    {
+      "tick": 3005,
+      "bytes": 2074273,
+      "elapsedMs": 167.64809999999125,
+      "receivedAt": 326995.2009
+    },
+    {
+      "tick": 3006,
+      "bytes": 2075963,
+      "elapsedMs": 186.49560000002384,
+      "receivedAt": 327896.9324
+    },
+    {
+      "tick": 3008,
+      "bytes": 2076832,
+      "elapsedMs": 283.35389999998733,
+      "receivedAt": 328911.2437
+    },
+    {
+      "tick": 3010,
+      "bytes": 2078186,
+      "elapsedMs": 257.5689999999595,
+      "receivedAt": 329870.6475
+    },
+    {
+      "tick": 3012,
+      "bytes": 2079766,
+      "elapsedMs": 277.06139999994775,
+      "receivedAt": 330813.9187
+    },
+    {
+      "tick": 3014,
+      "bytes": 2080147,
+      "elapsedMs": 161.43170000001555,
+      "receivedAt": 331596.2809
+    },
+    {
+      "tick": 3016,
+      "bytes": 2078977,
+      "elapsedMs": 229.28289999999106,
+      "receivedAt": 332599.3958
+    },
+    {
+      "tick": 3021,
+      "bytes": 2081284,
+      "elapsedMs": 121.2738000000245,
+      "receivedAt": 333713.1191
+    },
+    {
+      "tick": 3025,
+      "bytes": 2082935,
+      "elapsedMs": 178.54880000004778,
+      "receivedAt": 334670.9606
+    },
+    {
+      "tick": 3028,
+      "bytes": 2083944,
+      "elapsedMs": 516.4010999999591,
+      "receivedAt": 335597.5955
+    },
+    {
+      "tick": 3032,
+      "bytes": 2084638,
+      "elapsedMs": 620.9421999999904,
+      "receivedAt": 336903.6434
+    },
+    {
+      "tick": 3035,
+      "bytes": 2085565,
+      "elapsedMs": 162.52470000000903,
+      "receivedAt": 337622.939
+    },
+    {
+      "tick": 3038,
+      "bytes": 2085832,
+      "elapsedMs": 369.422600000049,
+      "receivedAt": 338765.5382
+    },
+    {
+      "tick": 3042,
+      "bytes": 2087090,
+      "elapsedMs": 142.8143000000273,
+      "receivedAt": 339703.1489
+    },
+    {
+      "tick": 3045,
+      "bytes": 2088302,
+      "elapsedMs": 653.3543000000063,
+      "receivedAt": 341330.0794
+    },
+    {
+      "tick": 3048,
+      "bytes": 2089817,
+      "elapsedMs": 467.819599999988,
+      "receivedAt": 342269.0005
+    },
+    {
+      "tick": 3052,
+      "bytes": 2090215,
+      "elapsedMs": 781.108899999992,
+      "receivedAt": 343407.6333
+    },
+    {
+      "tick": 3056,
+      "bytes": 2091614,
+      "elapsedMs": 536.9782000000123,
+      "receivedAt": 344231.946
+    },
+    {
+      "tick": 3061,
+      "bytes": 2091664,
+      "elapsedMs": 1029.6440000000293,
+      "receivedAt": 345576.1174
+    },
+    {
+      "tick": 3064,
+      "bytes": 2094974,
+      "elapsedMs": 639.9809000000241,
+      "receivedAt": 346589.5578
+    },
+    {
+      "tick": 3068,
+      "bytes": 2094660,
+      "elapsedMs": 446.89160000003176,
+      "receivedAt": 347138.5313
+    },
+    {
+      "tick": 3072,
+      "bytes": 2095396,
+      "elapsedMs": 141.86369999998715,
+      "receivedAt": 347756.8077
+    },
+    {
+      "tick": 3073,
+      "bytes": 2095624,
+      "elapsedMs": 232.58920000004582,
+      "receivedAt": 348618.6889
+    },
+    {
+      "tick": 3073,
+      "bytes": 2095624,
+      "elapsedMs": 192.2836000000243,
+      "receivedAt": 349369.0508
+    }
+  ],
+  "errors": [],
+  "finalTick": 3073,
+  "living": 118,
+  "providerRequests": 0,
+  "selectedRememberedTiles": 589,
+  "finalSnapshotBytes": 2095624
+}

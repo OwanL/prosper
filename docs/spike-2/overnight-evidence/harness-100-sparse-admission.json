@@ -1,0 +1,997 @@
+{
+  "label": "Offline mock continuation benchmark, not live model quality or actual token usage",
+  "seed": 7,
+  "founders": 100,
+  "ticks": 6000,
+  "elapsedMs": 292981.5764,
+  "citizenTicks": 656790,
+  "simulationCitizenHours": 45.610416666666666,
+  "scheduledMockReviews": 23,
+  "scheduledReviewsPerSimulationCitizenHour": 0.5042707714794683,
+  "providerRequests": 0,
+  "actualProviderTokens": 0,
+  "payloadSamples": 120,
+  "compactP50": 26347,
+  "compactP95": 28667,
+  "legacyP50": 125310,
+  "legacyP95": 143191,
+  "requests": [
+    {
+      "tick": 2471,
+      "citizenId": "citizen-2103",
+      "bytes": 26597
+    },
+    {
+      "tick": 2978,
+      "citizenId": "citizen-2127",
+      "bytes": 26671
+    },
+    {
+      "tick": 3098,
+      "citizenId": "citizen-2112",
+      "bytes": 27072
+    },
+    {
+      "tick": 3218,
+      "citizenId": "citizen-2184",
+      "bytes": 26604
+    },
+    {
+      "tick": 3483,
+      "citizenId": "citizen-2109",
+      "bytes": 26692
+    },
+    {
+      "tick": 3603,
+      "citizenId": "citizen-2157",
+      "bytes": 26177
+    },
+    {
+      "tick": 3818,
+      "citizenId": "citizen-2121",
+      "bytes": 25857
+    },
+    {
+      "tick": 4113,
+      "citizenId": "citizen-2108",
+      "bytes": 27294
+    },
+    {
+      "tick": 4233,
+      "citizenId": "citizen-2163",
+      "bytes": 25953
+    },
+    {
+      "tick": 4353,
+      "citizenId": "citizen-2103",
+      "bytes": 26985
+    },
+    {
+      "tick": 4473,
+      "citizenId": "citizen-2114",
+      "bytes": 28473
+    },
+    {
+      "tick": 4593,
+      "citizenId": "citizen-2131",
+      "bytes": 27943
+    },
+    {
+      "tick": 4713,
+      "citizenId": "citizen-2190",
+      "bytes": 28768
+    },
+    {
+      "tick": 4833,
+      "citizenId": "citizen-2118",
+      "bytes": 27658
+    },
+    {
+      "tick": 4953,
+      "citizenId": "citizen-2127",
+      "bytes": 27213
+    },
+    {
+      "tick": 5073,
+      "citizenId": "citizen-2175",
+      "bytes": 26772
+    },
+    {
+      "tick": 5193,
+      "citizenId": "citizen-2104",
+      "bytes": 26430
+    },
+    {
+      "tick": 5313,
+      "citizenId": "citizen-2148",
+      "bytes": 27441
+    },
+    {
+      "tick": 5433,
+      "citizenId": "citizen-2113",
+      "bytes": 28149
+    },
+    {
+      "tick": 5553,
+      "citizenId": "citizen-2102",
+      "bytes": 28505
+    },
+    {
+      "tick": 5673,
+      "citizenId": "citizen-2157",
+      "bytes": 26760
+    },
+    {
+      "tick": 5793,
+      "citizenId": "citizen-2111",
+      "bytes": 28840
+    },
+    {
+      "tick": 5913,
+      "citizenId": "citizen-2126",
+      "bytes": 25930
+    }
+  ],
+  "samples": [
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2101",
+      "compactBytes": 23213,
+      "legacyBytes": 133793
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2102",
+      "compactBytes": 23277,
+      "legacyBytes": 137167
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2103",
+      "compactBytes": 24811,
+      "legacyBytes": 122612
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2104",
+      "compactBytes": 24035,
+      "legacyBytes": 122953
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2105",
+      "compactBytes": 23841,
+      "legacyBytes": 139785
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2106",
+      "compactBytes": 21219,
+      "legacyBytes": 109293
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2107",
+      "compactBytes": 24171,
+      "legacyBytes": 144521
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2108",
+      "compactBytes": 22807,
+      "legacyBytes": 144658
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2109",
+      "compactBytes": 24512,
+      "legacyBytes": 131274
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2110",
+      "compactBytes": 24234,
+      "legacyBytes": 148414
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2111",
+      "compactBytes": 24043,
+      "legacyBytes": 133841
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2112",
+      "compactBytes": 26062,
+      "legacyBytes": 129100
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2113",
+      "compactBytes": 24082,
+      "legacyBytes": 139469
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2114",
+      "compactBytes": 23654,
+      "legacyBytes": 137186
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2115",
+      "compactBytes": 24413,
+      "legacyBytes": 130332
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2116",
+      "compactBytes": 22719,
+      "legacyBytes": 143191
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2117",
+      "compactBytes": 22566,
+      "legacyBytes": 120882
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2118",
+      "compactBytes": 25865,
+      "legacyBytes": 136828
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2119",
+      "compactBytes": 23428,
+      "legacyBytes": 138759
+    },
+    {
+      "tick": 1000,
+      "citizenId": "citizen-2120",
+      "compactBytes": 23402,
+      "legacyBytes": 135202
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2101",
+      "compactBytes": 25720,
+      "legacyBytes": 135204
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2102",
+      "compactBytes": 25074,
+      "legacyBytes": 122960
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2103",
+      "compactBytes": 26202,
+      "legacyBytes": 129233
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2104",
+      "compactBytes": 25250,
+      "legacyBytes": 116343
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2105",
+      "compactBytes": 25660,
+      "legacyBytes": 116749
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2106",
+      "compactBytes": 22592,
+      "legacyBytes": 98468
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2107",
+      "compactBytes": 25808,
+      "legacyBytes": 126128
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2108",
+      "compactBytes": 25736,
+      "legacyBytes": 117848
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2109",
+      "compactBytes": 26260,
+      "legacyBytes": 132775
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2110",
+      "compactBytes": 26285,
+      "legacyBytes": 150437
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2111",
+      "compactBytes": 25326,
+      "legacyBytes": 120219
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2112",
+      "compactBytes": 26886,
+      "legacyBytes": 120506
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2113",
+      "compactBytes": 26597,
+      "legacyBytes": 138490
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2114",
+      "compactBytes": 26270,
+      "legacyBytes": 114026
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2115",
+      "compactBytes": 26664,
+      "legacyBytes": 119711
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2116",
+      "compactBytes": 23300,
+      "legacyBytes": 134754
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2117",
+      "compactBytes": 23045,
+      "legacyBytes": 106396
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2118",
+      "compactBytes": 27100,
+      "legacyBytes": 122626
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2119",
+      "compactBytes": 24943,
+      "legacyBytes": 132130
+    },
+    {
+      "tick": 2000,
+      "citizenId": "citizen-2120",
+      "compactBytes": 26117,
+      "legacyBytes": 110102
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2101",
+      "compactBytes": 26915,
+      "legacyBytes": 117339
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2102",
+      "compactBytes": 27685,
+      "legacyBytes": 117624
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2103",
+      "compactBytes": 26235,
+      "legacyBytes": 125084
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2104",
+      "compactBytes": 26095,
+      "legacyBytes": 119403
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2105",
+      "compactBytes": 26946,
+      "legacyBytes": 116730
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2106",
+      "compactBytes": 26629,
+      "legacyBytes": 134656
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2107",
+      "compactBytes": 26972,
+      "legacyBytes": 132672
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2108",
+      "compactBytes": 27169,
+      "legacyBytes": 118088
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2109",
+      "compactBytes": 26755,
+      "legacyBytes": 116561
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2110",
+      "compactBytes": 27199,
+      "legacyBytes": 124887
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2111",
+      "compactBytes": 26493,
+      "legacyBytes": 108130
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2112",
+      "compactBytes": 27223,
+      "legacyBytes": 118198
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2113",
+      "compactBytes": 26878,
+      "legacyBytes": 131793
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2114",
+      "compactBytes": 27489,
+      "legacyBytes": 113665
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2115",
+      "compactBytes": 26453,
+      "legacyBytes": 117630
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2116",
+      "compactBytes": 22347,
+      "legacyBytes": 105208
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2117",
+      "compactBytes": 25089,
+      "legacyBytes": 109228
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2118",
+      "compactBytes": 27345,
+      "legacyBytes": 120254
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2119",
+      "compactBytes": 26163,
+      "legacyBytes": 140166
+    },
+    {
+      "tick": 3000,
+      "citizenId": "citizen-2120",
+      "compactBytes": 26317,
+      "legacyBytes": 112253
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2101",
+      "compactBytes": 26292,
+      "legacyBytes": 120176
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2102",
+      "compactBytes": 29055,
+      "legacyBytes": 122123
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2103",
+      "compactBytes": 26840,
+      "legacyBytes": 127229
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2104",
+      "compactBytes": 25933,
+      "legacyBytes": 122639
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2105",
+      "compactBytes": 25267,
+      "legacyBytes": 121747
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2106",
+      "compactBytes": 24666,
+      "legacyBytes": 108062
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2107",
+      "compactBytes": 27507,
+      "legacyBytes": 133605
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2108",
+      "compactBytes": 27123,
+      "legacyBytes": 121242
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2109",
+      "compactBytes": 26973,
+      "legacyBytes": 119073
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2110",
+      "compactBytes": 26753,
+      "legacyBytes": 115042
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2111",
+      "compactBytes": 28325,
+      "legacyBytes": 119642
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2112",
+      "compactBytes": 28161,
+      "legacyBytes": 121466
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2113",
+      "compactBytes": 27513,
+      "legacyBytes": 130347
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2114",
+      "compactBytes": 28400,
+      "legacyBytes": 121277
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2115",
+      "compactBytes": 26421,
+      "legacyBytes": 123065
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2116",
+      "compactBytes": 24935,
+      "legacyBytes": 128429
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2117",
+      "compactBytes": 25687,
+      "legacyBytes": 110781
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2118",
+      "compactBytes": 27607,
+      "legacyBytes": 122381
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2119",
+      "compactBytes": 26292,
+      "legacyBytes": 128687
+    },
+    {
+      "tick": 4000,
+      "citizenId": "citizen-2120",
+      "compactBytes": 27443,
+      "legacyBytes": 117097
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2101",
+      "compactBytes": 26067,
+      "legacyBytes": 122085
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2102",
+      "compactBytes": 28867,
+      "legacyBytes": 126262
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2103",
+      "compactBytes": 27245,
+      "legacyBytes": 131731
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2104",
+      "compactBytes": 26247,
+      "legacyBytes": 126779
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2105",
+      "compactBytes": 26973,
+      "legacyBytes": 127222
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2106",
+      "compactBytes": 27297,
+      "legacyBytes": 121920
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2107",
+      "compactBytes": 28032,
+      "legacyBytes": 121240
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2108",
+      "compactBytes": 27876,
+      "legacyBytes": 126631
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2109",
+      "compactBytes": 27358,
+      "legacyBytes": 123786
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2110",
+      "compactBytes": 27213,
+      "legacyBytes": 121140
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2111",
+      "compactBytes": 29581,
+      "legacyBytes": 128265
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2112",
+      "compactBytes": 28433,
+      "legacyBytes": 125505
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2113",
+      "compactBytes": 28047,
+      "legacyBytes": 133394
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2114",
+      "compactBytes": 28549,
+      "legacyBytes": 125935
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2115",
+      "compactBytes": 27468,
+      "legacyBytes": 127522
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2116",
+      "compactBytes": 25659,
+      "legacyBytes": 130865
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2117",
+      "compactBytes": 26347,
+      "legacyBytes": 125486
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2118",
+      "compactBytes": 27979,
+      "legacyBytes": 126827
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2119",
+      "compactBytes": 25118,
+      "legacyBytes": 146869
+    },
+    {
+      "tick": 5000,
+      "citizenId": "citizen-2120",
+      "compactBytes": 26644,
+      "legacyBytes": 119524
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2101",
+      "compactBytes": 24765,
+      "legacyBytes": 122623
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2102",
+      "compactBytes": 28913,
+      "legacyBytes": 129006
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2103",
+      "compactBytes": 27355,
+      "legacyBytes": 132390
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2104",
+      "compactBytes": 26760,
+      "legacyBytes": 127340
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2105",
+      "compactBytes": 24690,
+      "legacyBytes": 128748
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2106",
+      "compactBytes": 27186,
+      "legacyBytes": 128807
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2107",
+      "compactBytes": 26854,
+      "legacyBytes": 133792
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2108",
+      "compactBytes": 28667,
+      "legacyBytes": 129325
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2109",
+      "compactBytes": 27465,
+      "legacyBytes": 123953
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2110",
+      "compactBytes": 25911,
+      "legacyBytes": 148868
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2111",
+      "compactBytes": 29089,
+      "legacyBytes": 127094
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2112",
+      "compactBytes": 28433,
+      "legacyBytes": 125045
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2113",
+      "compactBytes": 28445,
+      "legacyBytes": 133025
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2114",
+      "compactBytes": 28998,
+      "legacyBytes": 125310
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2115",
+      "compactBytes": 26843,
+      "legacyBytes": 129425
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2116",
+      "compactBytes": 25116,
+      "legacyBytes": 121231
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2117",
+      "compactBytes": 26316,
+      "legacyBytes": 117491
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2118",
+      "compactBytes": 28284,
+      "legacyBytes": 133575
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2119",
+      "compactBytes": 24114,
+      "legacyBytes": 130173
+    },
+    {
+      "tick": 6000,
+      "citizenId": "citizen-2120",
+      "compactBytes": 27556,
+      "legacyBytes": 120002
+    }
+  ],
+  "reasons": [
+    {
+      "tick": 2471,
+      "citizenId": "citizen-2103",
+      "reason": "repeated resource dispute with substantial grievance",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 2978,
+      "citizenId": "citizen-2127",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 3098,
+      "citizenId": "citizen-2112",
+      "reason": "repeated resource dispute with substantial grievance",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 3218,
+      "citizenId": "citizen-2184",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 3483,
+      "citizenId": "citizen-2109",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 3603,
+      "citizenId": "citizen-2157",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 3818,
+      "citizenId": "citizen-2121",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4113,
+      "citizenId": "citizen-2108",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4233,
+      "citizenId": "citizen-2163",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4353,
+      "citizenId": "citizen-2103",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4473,
+      "citizenId": "citizen-2114",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4593,
+      "citizenId": "citizen-2131",
+      "reason": "repeated resource dispute with substantial grievance",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4713,
+      "citizenId": "citizen-2190",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4833,
+      "citizenId": "citizen-2118",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 4953,
+      "citizenId": "citizen-2127",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5073,
+      "citizenId": "citizen-2175",
+      "reason": "repeated resource dispute with substantial grievance",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5193,
+      "citizenId": "citizen-2104",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5313,
+      "citizenId": "citizen-2148",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5433,
+      "citizenId": "citizen-2113",
+      "reason": "repeated resource dispute with substantial grievance",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5553,
+      "citizenId": "citizen-2102",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5673,
+      "citizenId": "citizen-2157",
+      "reason": "repeated resource dispute with substantial grievance",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5793,
+      "citizenId": "citizen-2111",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    },
+    {
+      "tick": 5913,
+      "citizenId": "citizen-2126",
+      "reason": "local livelihood stalled despite autonomous attempts",
+      "policyOutcome": "continued"
+    }
+  ]
+}

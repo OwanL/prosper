@@ -24,7 +24,6 @@ function citizen(id: string, x: number, y: number): Citizen {
     gold: 100,
     personality: 'private personality',
     inventory: { 'food:1': 3, 'axe:1': 1 },
-    equipment: { axe: 'axe:1' },
     action: null,
     queue: [],
     goals: ['private goal'],
@@ -191,7 +190,7 @@ describe('citizen knowledge projection', () => {
     };
     const observation = observe(world, 'self');
     expect(observation.citizen.inventory).toEqual(self.inventory);
-    expect(observation.citizen.equipment).toEqual(self.equipment);
+    expect(observation.citizen.inventory).toEqual(self.inventory);
     expect(observation.citizen.action).toMatchObject({
       target: { x: 8, y: 1 },
       path: [{ x: 2, y: 1 }],

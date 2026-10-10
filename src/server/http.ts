@@ -61,8 +61,42 @@ export function createApiServer(
           json(response, 200, runtime.snapshot());
           return;
         }
+        if (request.method === 'GET' && pathname === '/api/motion') {
+          response.writeHead(200, {
+            'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',
+            Connection: 'keep-alive', 'X-Accel-Buffering': 'no',
+          });
+          response.flushHeaders();
+          const unsubscribe = runtime.subscribeMotion(snapshot => {
+            if (response.destroyed || response.writableLength > 256_000) {
+              response.destroy();
+              return;
+            }
+            response.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+          });
+          const heartbeat = setInterval(() => {
+            if (!response.destroyed) response.write(': heartbeat\n\n');
+          }, 15000);
+          heartbeat.unref();
+          response.once('close', () => { clearInterval(heartbeat); unsubscribe(); });
+          return;
+        }
         if (request.method === 'GET' && pathname === '/api/scenarios') {
           json(response, 200, { scenarios: ['village', 'competition', 'progression'] });
+          return;
+        }
+        if (request.method === 'GET' && pathname === '/api/history/global') {
+          json(response, 200, runtime.globalHistory());
+          return;
+        }
+        const history = /^\/api\/citizens\/([^/]+)\/history$/.exec(pathname);
+        if (request.method === 'GET' && history) {
+          const id = decodeURIComponent(history[1]);
+          if (!Object.hasOwn(runtime.world.citizens, id)) {
+            json(response, 404, { error: 'Unknown citizen.' });
+            return;
+          }
+          json(response, 200, runtime.citizenHistory(id));
           return;
         }
         const observation = /^\/api\/citizens\/([^/]+)\/observation$/.exec(pathname);
@@ -72,6 +106,10 @@ export function createApiServer(
         }
         if (request.method === 'POST') {
           const value = await body(request);
+          if (pathname === '/api/budget') {
+            json(response, 200, runtime.updateBudget(value));
+            return;
+          }
           if (pathname === '/api/control') {
             json(response, 200, runtime.control(value));
             return;

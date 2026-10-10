@@ -1,75 +1,96 @@
-# Prosper: spike 2
+﻿# Prosper
 
-A small game-like world for experimenting with citizen reasoning, specialization and conflict. This branch starts afresh from `main`; the first spike is preserved on `spike/citizen-sandbox`.
+A watchable society simulation: citizens work, trade, form families and alliances, claim resources, threaten trespassers and sometimes fight. A continuous local controller handles ordinary life. An optional language model occasionally revises lasting policy in one structured response. The first spike remains on `spike/citizen-sandbox`; this checkout develops the richer spike 2 economy.
 
 ## Run
 
-Node **24.16.0**, npm **11.13.0** (the repository pins both).
+Node **24.16.0**, npm **11.13.0** (repository pins both).
 
-```sh
-npm ci
-npm run dev
+```powershell
+npm.cmd ci
+npm.cmd run dev
 ```
 
-Open **http://127.0.0.1:5173**. The world starts paused in **SCRIPTED** mode. Select a character, press Play or Step, and use the dossier to see its physical work, inventory, goals and reasoning/tool receipts. Zoom or use the roster to identify characters; switch to citizen knowledge to distinguish current sightings from dated memories.
+Open **http://127.0.0.1:5173**. New village worlds start with **20 citizens**, paused in **Local AI**, with no model calls. The world fills the workspace by default. A compact activity strip shows recent consequential events; select one to inspect its actor or recorded location. The top bar keeps Play/Pause, speed and connection state visible. Opening panels never starts inference.
 
-The default planner demonstrates mechanics. It is not an evaluation of the model or evidence of emergent citizen behavior. The world implements harvesting/tool progression, crafting, stations, walls, escrow markets, combat/death/loot, hunger and mutually consented reproduction. The scripted planner intentionally exercises only a subset; other mechanics can be exercised through tools, fixtures or the debug command API.
+**Citizens** provides searchable names and current activity. Selecting a citizen on the map or in the list opens their **Now**, **Motivation** and **History** panel; **Follow on map** tracks a sighted selection. **Messages** keeps conversation out of the map. **Settings** holds reasoning mode, map layers, optional speech bubbles, knowledge view, confirmed reset/scenario controls, budget settings and diagnostics. **Back to world** or Escape closes the current panel. Mobile shows one intentional panel at a time rather than stacking feeds; each panel scrolls independently. Tabs support arrow-key navigation.
 
-### Iteration
+Navigate with drag and pointer-anchored wheel zoom. Double-click a sighted citizen to follow. Focus the map for arrows/WASD pan, +/- zoom, F/Home fit and Escape release; manual navigation releases Follow and director control. Follow uses the same animation frame as the sprite. **Map guide** explains territory, combat marks and keyboard navigation. Speech bubbles are off by default to leave the game visible; enable them in Settings. Reduced-motion preferences are respected.
 
-- UI/CSS edits update through Vite without restarting the world.
-- Backend edits pause, interrupt unfinished reasoning, checkpoint, restart and restore the same run. Committed effects and partial physical work survive. Previously running worlds continue; paused worlds stay paused.
-- Restart failures leave a visible error and the checkpoint intact. Fix the backend source and save again to retry. Never reset the world as a repair for unknown accounting or restore failures.
-- `npm run build` creates a production UI; `npm start` serves it and the API on **http://127.0.0.1:4310**.
+**Charts** opens an on-demand drawer: **Overview** shows current population/wellbeing/action summaries and recorded population or average wellbeing; **Markets** compares selected commodity bid/ask histories and offers price, actual traded volume and gold-turnover views; **Resources** distinguishes carried, held and ground stock from open sell offers and buy demand. In Markets, expand **Commodities** to toggle item/tier checkboxes on one shared gold-per-unit graph. Colors remain stable; bids are solid and asks dashed. **Select all** and **Clear all** do not change the world.
 
-Dev uses ports **5173**, **4310** (stable API/reload proxy) and **4312** (backend child). Close the dev command with Ctrl+C. Browser tests use these ports and must run without a dev instance already using them.
+Select a citizen, then **History**, for cash, funded-buy escrow and vitals; gold holdings are not estimated inventory net worth. Recording starts at the actual current tick, samples every 20 ticks and retains 256 frames in checkpoints. No earlier history is reconstructed. Missing quotes remain gaps, not zero prices; old execution prices retain their execution-tick label. Hover the graph or use its sample cursor for exact values; **Exact samples** and **About these samples** provide audit details without obscuring the graph. Knowledge view hides spectator history and diagnostics. The activity strip contains retained events, not lifetime totals; historical trade windows count settlements directly. Hatching marks competing claims, not confirmed fighting.
 
-### Fast, headless mechanical trials
+Fresh maps have **six concentric bands**, with T1 at the outskirts and tiers increasing inward. Each band rarely yields the next tier, including T7 at the center. Change **`RING_COUNT` in `src/shared/tiers.ts`** to add bands and tiers together; recipes, mechanics, schemas and display derive from that setting. Citizens automatically use the highest-tier matching tool or sword in their available inventory. Tools never wear out or need servicing; use does not consume wood/fibre supplies. Tools can be sold or gifted without equip/unequip steps and transfer intact on death. Each recipe uses its exact tier, with costs doubling per tier (T6 costs 32× T1, T7 costs 64×). Owned mills, spinning wheels and butcheries convert 3 lower-tier units into 1 of the next tier, or 1 higher-tier unit into 2 of the previous tier. A station must reach the lower of the two tiers. Citizens can choose down-conversion when preparing lower-tier ingredients. Alliances share one representative-owned territory, defend its resources and honor its paid access; automatic claims seek bounded resource patches (radius 1–3), with ambition influencing their size. Citizens place funded resting bids for unmet needs and limited resale inventory, preserving liquidity and protected inputs. Deliberate disputes remain possible; these rules do not guarantee profitable trading or an efficient equilibrium.
 
-```sh
-npm run trial -- --scenario progression --seed 1 --ticks 360
+Founders and newborns use a bundled first-name/surname database rather than numeric name suffixes. Allocation avoids names already held by living or dead citizens; existing saved names are not rewritten.
+
+Existing saves retain their population, map and policies. Use **Reset world** to archive and start a new procedural-ring map with 20 founders, leaving **Founding population** empty. The small competition/progression mechanics scenarios retain their specialized defaults.
+
+The local mind uses inherited traits, personal evidence and explicit social signals over utility/rule decisions. Aggregate behavior can emerge from those rules without a model. Seeded runs establish what those controllers do; they do not establish spontaneous LLM intelligence. Existing saved worlds retain their old citizens and policies. **Reset world** archives the current world and creates a fresh run with new controllers; it keeps spending and budget limits. Incompatible checkpoints fail visibly instead of silently resetting.
+
+To create 100 citizens, enter **100** in **Settings → Founding population**, then choose **Reset world** (archives the current run) or **Load scenario**. Leave the input empty to use the default population. The same operation is available through the ordinary API:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5173/api/control -Method Post -ContentType 'application/json' -Body '{"type":"scenario","scenario":"competition","population":100}'
 ```
 
-This runs a repeatable scripted case without model access or persistent experiment data, then prints a JSON summary: action completions/errors, survival, holdings, equipment and gold conservation. Scenarios: `village`, `competition`, `progression`. They share world rules but differ in starting population. Use `--output <path>` to retain a summary; it will not overwrite an existing file.
+This explicitly replaces the displayed world, paused in Local AI. Population accepts 1–250. To archive before replacement, send `{"type":"reset","population":100}` instead. Alternatively set `$env:PROSPER_POPULATION='100'` before creating a fresh run. For a separate experiment, set a uniquely named `$env:PROSPER_DATA_DIR` and `$env:PROSPER_RESTORE='0'`; existing durable directories remain intact.
 
-### Live model mode
+### Iteration and persistence
 
-A local, authenticated Ollama service must expose **`deepseek-v4.1-flash:cloud`** at `http://127.0.0.1:11434`. In the browser, explicitly choose **Live** and press Play. Requests use high reasoning, fresh contexts, persistent goals/notes and bounded tool calls. No provider fallback occurs.
+UI/CSS edits update through Vite. Backend edits pause, interrupt unfinished inference, checkpoint, restart and restore the same run, including partial physical work. Previously running worlds resume; paused worlds remain paused. Failed reloads retain the checkpoint and expose an error. Never reset or delete accounting as a repair.
 
-Live requests default to a **120-second deadline**, four concurrent citizen turns, and a durable **100-request / 100,000-token** budget. `PROSPER_REQUEST_TIMEOUT_MS` changes the request deadline (maximum 600,000ms). Budgets include pending/uncertain calls; cancellation does not guarantee the provider stops processing or charging. These are request/token limits, **not a dollar cap** or verified billing prices. Missing usage is charged conservatively from request bytes and the output limit. Configure larger budgets through `RuntimeOptions.runner.ledgerOptions` only deliberately; never delete the ledger to recover capacity.
+Dev uses ports **5173**, **4310** (stable API proxy) and **4312** (backend child). Stop with Ctrl+C. `npm.cmd run build` creates the production UI; `npm.cmd start` serves it and the API at **http://127.0.0.1:4310**.
 
-The local Ollama catalog was reachable and listed the model during implementation. Actual cloud inference, tool compatibility and live citizen behavior have **not** been verified. All implementation tests used scripted, recorded or mocked responses and made no paid inference requests.
+State lives in **`.prosper-v2/`**, separate from old **`.prosper/`**. Neither should be deleted to troubleshoot. `checkpoint.json` is an atomic reload/save boundary, not an autosave of every tick. `request-ledger.jsonl` reserves before sending and is independent of checkpoints. `budget-settings.jsonl` retains explicit cap edits. Private `diagnostics/<run-id>.jsonl` records model requests and outcomes. `PROSPER_DATA_DIR` overrides the directory; tests use OS-temp data. Existing checkpoints restore by default; `PROSPER_RESTORE=1` requires valid restore and `0` explicitly creates a fresh paused world without resetting accounting.
 
-Recorded mode requires explicit fixture import through `/api/fixtures`; it never silently switches to live. See [citizen integration](src/citizen/README.md) and [runtime/API documentation](src/server/README.md).
+### Optional model policies
 
-## State and diagnostics
+Ollama at `http://127.0.0.1:11434` must provide the exact selected model. **Live** defaults to **`qwen3.5:9b`**, using local constrained JSON, thinking disabled and an explicit 8K context. No automatic model download or cloud fallback occurs. Choose another model before startup:
 
-Spike 2 writes to **`.prosper-v2/`**, separate from the old spike's **`.prosper/`**. Existing old worlds and spending records are untouched. Do not delete either directory to troubleshoot.
-
-- `checkpoint.json`: versioned world and runtime intent, atomically saved for reload or explicit checkpoint.
-- `request-ledger.jsonl`: independent durable accounting; not rewound by checkpoint restore or scenario changes.
-- `diagnostics/<run-id>.jsonl`: private observations, requests, outcomes and command application ordering. Browser histories are bounded; complete retained details are here.
-
-`PROSPER_DATA_DIR` selects another directory. Tests use temporary directories. `PROSPER_RESTORE=1` requires a valid checkpoint; `PROSPER_RESTORE=0` explicitly starts a new paused scripted run without deleting accounting. By default, an existing checkpoint restores. Checkpoints are not crash-proof autosaves of every tick: graceful reload/save is the persistence boundary. Preserve a checkpoint before intentionally stopping an experiment.
-
-Observer diagnostics may contain private citizen messages, but they are never fed back as citizen knowledge. The citizen view uses only current local sightings, dated memories and the explicit public/owner-alert exceptions.
-
-## Verify
-
-```sh
-npm run typecheck
-npm test
-npm run build
-npm run test:browser
+```powershell
+$env:PROSPER_MODEL='qwen3.5:9b' # local
+# Explicit cloud alternatives, when available to your account:
+# $env:PROSPER_MODEL='gemma4:31b-cloud'
+# $env:PROSPER_MODEL='deepseek-v4.1-flash:cloud'
+npm.cmd run dev
 ```
 
-Browser tests launch headless Chrome if installed at the standard Windows location, otherwise Playwright Chromium must be available (`npx playwright install chromium`). Their temporary data is isolated and their processes are cleaned up. No visible desktop interaction is required.
+Choose **Live** and press Play. The single `set_policy` response revises livelihood, reserve, prices, territory, boundaries, aggression, ally/rival preferences, family preference, goals, memory and up to two messages. Bodies handle routing, survival, production, commerce and immediate social reactions while inference runs. Unknown people, invalid coordinates and invalid policies are rejected without correction calls. New explicit policy commits supersede older in-flight responses; ordinary local adaptation does not invalidate useful intent. Consent remains mutual and revocable.
+
+Live uses **one request per review**, **1,200 output tokens**, and **one concurrent request**. Startup verifies installed local model metadata, rather than assuming a loopback endpoint cannot bill cloud usage. **Verified local models** get initial reviews staggered across 120 ticks and recurring policy reviews every **600 ticks**, with a **one-second** minimum send gap and a **600/hour** ceiling. Oldest-review priority rotates opportunities across citizens; successful model replies cannot postpone local reviews for thousands of ticks. Actual frequency depends on inference latency and population. Failures back off while physical work continues.
+
+**Cloud and unverified models** retain the conservative **30-second / 120-tick** send gap, **30/hour** ceiling, event-driven eligibility and 10,000-tick age fallback. All profiles retain durable request/token budgets and rate guards across reloads. The default **100-request / 100,000-token** lifetime budget is shared across runs and models; previously configured limits remain intact. `PROSPER_REQUEST_TIMEOUT_MS` changes the 120-second deadline (maximum 600,000ms).
+
+Spectator motion uses a lightweight per-tick stream with confirmed route steps and a short playback buffer, independently of the slower full-state dashboard poll. This preserves corners and follows movement continuously. Citizen-knowledge view never receives the spectator stream.
+
+Request/token limits are **not a dollar cap** or an observed account balance. Pending/uncertain calls remain charged; cancellation does not establish that billing stopped. Missing usage retains the conservative request-byte-plus-output reservation. Explicit **Budget settings → Apply budget** changes total caps while preserving history. Never delete the ledger to regain capacity. A blocked model does not stop the world.
+
+Bounded real probes checked local Qwen and cloud Gemma/DeepSeek, retaining failures as well as successes. Valid output alone does not establish useful policy: comparisons distinguish continuations from changes and inspect later behavior. Cloud schema support differs from local Ollama, and small models can choose poor economics or motives. See [overnight evidence](docs/spike-2/OVERNIGHT.md).
+
+Recorded responses require explicit fixture import and never fall back to live. Historical physical directives/plans remain available through the legacy harness for debugging/replay. See [citizen integration](src/citizen/README.md) and [runtime/API documentation](src/server/README.md).
+
+## Verify and experiment
+
+```powershell
+npm.cmd run typecheck
+npm.cmd test
+npm.cmd run build
+npm.cmd run test:browser
+```
+
+The active browser suite covers the replacement game workspace and migrated API/accessibility/camera checks; older workbench-specific fixture files are retained as historical coverage, not part of this suite. Browser tests use isolated ports **5193/5190/5192**, which must be free, and headless installed Chrome or Playwright Chromium. Their temporary data and processes are cleaned up; an existing app on the ordinary dev ports is preserved. `PROSPER_UI_PORT`, `PROSPER_API_PORT` and `PROSPER_BACKEND_PORT` override development ports when explicitly needed.
+
+`npm.cmd exec -- tsx scripts/probe-policy.ts` is offline unless an explicit model and `--confirm-local` or `--confirm-cloud` are supplied. Each invocation has a hard two-send ceiling, unique ledger and retained evidence. Cloud experiments additionally require a reviewed spend allowance; the flag is not budget authorization. `npm.cmd exec -- tsx scripts/probe-runtime.ts` checks a genuinely running 100-citizen runtime and browser through HTTP, with zero model calls (build first).
+
+The historical mechanical trial remains `npm.cmd run trial -- --scenario progression --seed 1 --ticks 360`. It uses repeatable legacy scripted fixtures and reports conservation/outcomes; it is not the current autonomous society benchmark.
 
 ## Design and learnings
 
-- [World rules](docs/spike-2/world.md)
-- [Citizen direction](docs/spike-2/citizen.md)
-- [Technical plan](docs/spike-2/technical-plan.md)
-- [Implementation decisions and learnings](docs/spike-2/LEARNINGS.md)
+- [Current layered design and overnight evidence](docs/spike-2/OVERNIGHT.md)
+- [Six-tier economy, saved-run audit and hardware/model shortlist](docs/spike-2/economy-six-tiers.md)
+- [Implementation history and learnings](docs/spike-2/LEARNINGS.md)
+- [World mechanics](docs/spike-2/world.md), [citizen direction](docs/spike-2/citizen.md), [architecture and implementation history](docs/spike-2/technical-plan.md)
 
-The mechanics tests establish implementation behavior. Scripted/recorded runs are useful for reproducibility, not evidence that live citizens spontaneously trade, specialize, reproduce or fight.
+The overnight direction supersedes old restrictions on automatic survival and borrowing first-spike ideas. Mechanics tests establish invariants. Normal seeded local runs establish controller behavior. Claims about model quality require actual receipts and downstream comparisons. Player interaction remains out of scope; the command API is spectator debugging.

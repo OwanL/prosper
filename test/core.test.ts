@@ -6,12 +6,16 @@ import type {
   Deposit,
   Resource,
   Tier,
+  ToolKind,
+  BuildingKind,
   World,
 } from '../src/shared/types.ts';
-import { distance, regionAt } from '../src/shared/utils.ts';
-import { BALANCE, buildingRecipe, harvestDuration, nutrition } from '../src/world/config.ts';
+import { RING_COUNT, MAX_TIER, TIERS } from '../src/shared/tiers.ts';
+import { distance, regionAt, ringAt } from '../src/shared/utils.ts';
+import { BALANCE, buildingRecipe, equipmentRecipe, harvestDuration, nutrition } from '../src/world/config.ts';
 import { cancelAction, createWorld, dispatch, tickWorld } from '../src/world/core.ts';
 import { findPath } from '../src/world/pathfinding.ts';
+import { highestToolTier } from '../src/shared/tool-utils.ts';
 
 function fixture() {
   const world = createWorld({ seed: 42 });
@@ -60,6 +64,10 @@ function openSite(world: World, citizen: Citizen) {
   return points.sort((a, b) => distance(a, citizen) - distance(b, citizen))[0];
 }
 function gather(world: World, citizen: Citizen, resource: Resource, tier: Tier, quantity: number) {
+  // The mechanical progression script must provision meals during long work,
+  // just as the autonomous controller does. Gathering is no longer instant.
+  if (resource !== 'food' && (citizen.inventory['food:1'] ?? 0) < 7)
+    gather(world, citizen, 'food', 1, 9);
   let attempts = 0;
   while ((citizen.inventory[`${resource}:${tier}`] ?? 0) < quantity && attempts++ < 100) {
     const candidates = Object.values(world.deposits)
@@ -76,29 +84,48 @@ function gather(world: World, citizen: Citizen, resource: Resource, tier: Tier, 
 }
 
 describe('foundational world', () => {
-  it('creates deterministic regional supply and viable, equipped-once ring2 citizens', () => {
+  it.each([
+    ['village', 20, 7, 7, 6],
+    ['competition', 9, 7, 1, 1],
+    ['progression', 3, 1, 1, 1],
+  ] as const)(
+    'starts %s with %i citizens on distinct T1 outskirts deposits',
+    (scenario, population, food, wood, fibre) => {
+      for (const seed of [1, 42, 927]) {
+        const world = createWorld({ seed, scenario });
+        const starts = Object.values(world.citizens).map((c) =>
+          Object.values(world.deposits).find((d) => d.x === c.x && d.y === c.y)!,
+        );
+        expect(starts).toHaveLength(population);
+        expect(starts.filter((d) => d.resource === 'food')).toHaveLength(food);
+        expect(starts.filter((d) => d.resource === 'wood')).toHaveLength(wood);
+        expect(starts.filter((d) => d.resource === 'fibre')).toHaveLength(fibre);
+        expect(new Set(starts.map((d) => d.id)).size).toBe(starts.length);
+        expect(starts.every((d) => d.tier === 1 && ringAt(world, d) === RING_COUNT - 1)).toBe(true);
+      }
+    },
+  );
+  it('creates deterministic regional supply and viable outskirts citizens with carried supplies', () => {
     const { world } = fixture();
     expect(world).toEqual(createWorld({ seed: 42 }));
     expect(world.deposits).not.toEqual(createWorld({ seed: 43 }).deposits);
-    for (const region of ['ring2', 'ring1', 'center'] as const) {
-      const deposits = Object.values(world.deposits).filter((d) => regionAt(world, d) === region);
-      for (const resource of ['wood', 'food', 'fibre'])
-        expect(deposits.filter((d) => d.resource === resource).length).toBeGreaterThan(0);
-      if (region === 'ring2') {
-        expect(deposits.filter((d) => d.tier === 2).length / deposits.length).toBeLessThan(0.1);
-        expect(deposits.some((d) => d.tier === 3)).toBe(false);
+    expect(world.ringCount).toBe(RING_COUNT);
+    for (let ring = 0; ring < RING_COUNT; ring++) {
+      const deposits = Object.values(world.deposits).filter((d) => ringAt(world, d) === ring);
+      const baseTier = RING_COUNT - ring;
+      for (const resource of ['wood', 'food', 'fibre']) {
+        const supply = deposits.filter((d) => d.resource === resource);
+        if (resource === 'food' && ring === RING_COUNT - 1)
+          expect(supply.length).toBeGreaterThanOrEqual(Math.ceil(2.4 * (ring + 1)));
+        else expect(supply).toHaveLength(Math.ceil(2.4 * (ring + 1)));
+        expect(supply.some((d) => d.tier === baseTier)).toBe(true);
       }
-      if (region === 'ring1') {
-        expect(deposits.filter((d) => d.tier === 2).length).toBeGreaterThan(deposits.length / 2);
-        expect(deposits.some((d) => d.tier === 3)).toBe(false);
-      }
-      if (region === 'center') expect(deposits.every((d) => d.tier === 3)).toBe(true);
+      expect(deposits.every((d) => d.tier === baseTier || d.tier === baseTier + 1)).toBe(true);
     }
     for (const citizen of Object.values(world.citizens)) {
-      expect(regionAt(world, citizen)).toBe('ring2');
+      expect(regionAt(world, citizen)).toBe(`ring${RING_COUNT - 1}`);
       expect(citizen.gold).toBe(100);
       expect(citizen.fullness).toBe(100);
-      expect(citizen.equipment).toEqual({});
       expect(citizen.inventory).toEqual({ 'food:1': 3 });
       expect(
         Object.values(world.deposits).some((d) => d.tier === 1 && distance(d, citizen) === 0),
@@ -108,6 +135,63 @@ describe('foundational world', () => {
       Object.values(world.citizens).reduce((sum, c) => sum + c.gold, 0),
     );
     expect(JSON.parse(JSON.stringify(world))).toEqual(world);
+  });
+
+  it('scales map area and each resource supply with population', () => {
+    const world = createWorld({ seed: 42, population: 100 });
+    expect(Object.values(world.citizens)).toHaveLength(100);
+    expect(world.width).toBe(Math.ceil(BALANCE.width * Math.sqrt(5)));
+    expect(world.height).toBe(world.width);
+    for (const resource of ['wood', 'food', 'fibre']) {
+      for (let ring = 0; ring < RING_COUNT; ring++) {
+        const deposits = Object.values(world.deposits).filter((d) =>
+          d.resource === resource && ringAt(world, d) === ring);
+        if (resource === 'food' && ring === RING_COUNT - 1)
+          expect(deposits.length).toBeGreaterThanOrEqual(Math.ceil(2.4 * (ring + 1) * 5));
+        else expect(deposits).toHaveLength(Math.ceil(2.4 * (ring + 1) * 5));
+        const baseTier = RING_COUNT - ring;
+        expect(deposits.every((d) => d.tier === baseTier || d.tier === baseTier + 1)).toBe(true);
+      }
+    }
+  });
+
+  it.each(TIERS)('charges base recipes times 2**(tier-1) at T%i', (tier) => {
+    for (const [kind, base] of [
+      ['axe', { food: 3, fibre: 3 }], ['scythe', { wood: 3, food: 3 }],
+      ['knife', { wood: 3, fibre: 3 }], ['sword', { wood: 4, fibre: 4 }],
+    ] as [ToolKind, Record<string, number>][]) {
+      expect(equipmentRecipe(kind, tier)).toEqual(Object.fromEntries(
+        Object.entries(base).map(([resource, amount]) => [`${resource}:${tier}`, amount * 2 ** (tier - 1)]),
+      ));
+    }
+    for (const kind of ['lumbermill', 'butchery', 'spinning-wheel', 'wall'] as BuildingKind[]) {
+      expect(buildingRecipe(kind, tier)).toEqual({
+        [`wood:${tier}`]: (kind === 'wall' ? 4 : 6) * 2 ** (tier - 1),
+        [`fibre:${tier}`]: (kind === 'wall' ? 2 : 4) * 2 ** (tier - 1),
+      });
+    }
+  });
+
+  it.each(TIERS)('refines adjacent tiers 3->1 up and 1->2 down at station T%i', (tier) => {
+    const { world, citizen } = fixture();
+    const building = station(world, citizen, tier);
+    citizen.inventory = { [`wood:${tier}`]: 3 };
+    if (tier < MAX_TIER) {
+      send(world, citizen, { type: 'refine', buildingId: building.id, fromTier: tier });
+      expect(citizen.action?.reserved).toEqual({ [`wood:${tier}`]: 3 });
+      settle(world, citizen);
+      expect(citizen.inventory).toEqual({ [`wood:${tier + 1}`]: 1 });
+      send(world, citizen, { type: 'refine', buildingId: building.id, fromTier: (tier + 1) as Tier, direction: 'down' });
+      settle(world, citizen);
+      expect(citizen.inventory).toEqual({ [`wood:${tier}`]: 2 });
+    } else {
+      expect(dispatch(world, citizen.id, { type: 'refine', buildingId: building.id, fromTier: MAX_TIER }).code).toBe('invalid-refining-tier');
+      citizen.inventory = { [`wood:${MAX_TIER}`]: 1 };
+      send(world, citizen, { type: 'refine', buildingId: building.id, fromTier: MAX_TIER, direction: 'down' });
+      settle(world, citizen);
+      expect(citizen.inventory).toEqual({ [`wood:${MAX_TIER - 1}`]: 2 });
+    }
+    expect(dispatch(world, citizen.id, { type: 'refine', buildingId: building.id, fromTier: 1, direction: 'down' }).code).toBe('invalid-refining-tier');
   });
 
   it('finds deterministic orthogonal paths, allowing stations and shared tiles but not walls', () => {
@@ -168,10 +252,10 @@ describe('foundational world', () => {
 
   it('applies the exact matching-tool duration table and tier requirements', () => {
     for (const [tool, expected] of [
-      [0, [8, 0, 0]],
-      [1, [4, 8, 0]],
-      [2, [2, 4, 8]],
-      [3, [1, 2, 4]],
+      [0, [40, 0, 0]],
+      [1, [20, 40, 0]],
+      [2, [12, 20, 40]],
+      [3, [12, 12, 20]],
     ] as const) {
       for (const tier of [1, 2, 3] as const) {
         const { world, citizen } = fixture();
@@ -180,7 +264,6 @@ describe('foundational world', () => {
         citizen.y = node.y;
         if (tool) {
           citizen.inventory[`axe:${tool}`] = 1;
-          send(world, citizen, { type: 'equip', item: `axe:${tool}` });
         }
         const result = dispatch(world, citizen.id, { type: 'harvest', depositId: node.id });
         expect(result.ok).toBe(expected[tier - 1] > 0);
@@ -192,38 +275,69 @@ describe('foundational world', () => {
     }
     const { world, citizen } = fixture();
     citizen.inventory['scythe:3'] = 1;
-    send(world, citizen, { type: 'equip', item: 'scythe:3' });
     expect(
       dispatch(world, citizen.id, { type: 'harvest', depositId: deposit(world, 'wood', 2).id })
         .code,
     ).toBe('tool-required');
   });
 
-  it('counts equipped equipment once and locks its use through harvesting', () => {
+  it('selects only positive-count matching tools within the configured tier bounds', () => {
+    const citizen = { inventory: { 'axe:1': 1, 'axe:2': 2, 'axe:3': 0, 'axe:4': -1,
+      [`axe:${MAX_TIER + 1}`]: 1, 'axe:1.5': 1, 'axe:02': 1, 'sword:7': 1 } };
+    expect(highestToolTier(citizen, 'axe')).toBe(2);
+    expect(highestToolTier({ inventory: {} }, 'knife')).toBe(0);
+  });
+
+  it('uses the best matching carried tool and falls back when it enters escrow', () => {
     const { world, citizen } = fixture();
-    citizen.inventory['axe:1'] = 1;
-    send(world, citizen, { type: 'equip', item: 'axe:1' });
-    expect(citizen.inventory['axe:1']).toBe(1);
-    send(world, citizen, { type: 'harvest', depositId: deposit(world).id });
-    expect(dispatch(world, citizen.id, { type: 'unequip', kind: 'axe' }).code).toBe(
-      'equipment-in-use',
-    );
-    expect(
-      dispatch(world, citizen.id, {
-        type: 'order',
-        side: 'sell',
-        item: 'axe:1',
-        quantity: 1,
-        price: 5,
-      }).ok,
-    ).toBe(false);
+    const node = deposit(world, 'wood', 2);
+    citizen.x = node.x;
+    citizen.y = node.y;
+    citizen.inventory = { 'axe:1': 1, 'axe:2': 1, 'scythe:3': 1 };
+    send(world, citizen, { type: 'harvest', depositId: node.id });
+    expect(citizen.action?.duration).toBe(20);
     send(world, citizen, { type: 'cancel' });
-    send(world, citizen, { type: 'unequip', kind: 'axe' });
+    send(world, citizen, { type: 'order', side: 'sell', item: 'axe:2', quantity: 1, price: 5 });
+    expect(highestToolTier(citizen, 'axe')).toBe(1);
+    send(world, citizen, { type: 'harvest', depositId: node.id });
+    expect(citizen.action?.duration).toBe(40);
+    send(world, citizen, { type: 'order', side: 'sell', item: 'axe:1', quantity: 1, price: 5 });
+    tickWorld(world);
+    expect(citizen.action).toBeNull();
+    expect(citizen.lastResult).toContain('matching tool');
+  });
+
+  it('captures the best tool duration on travel arrival, not on later inventory changes', () => {
+    const { world, citizen } = fixture();
+    world.buildings = {};
+    world.deposits = { arrival: { id: 'arrival', x: 2, y: 1, resource: 'wood', tier: 2,
+      stock: 1, capacity: 1, regrowAt: 0 } };
+    citizen.x = 1;
+    citizen.y = 1;
+    citizen.inventory = { 'axe:1': 1 };
+    send(world, citizen, { type: 'harvest', depositId: 'arrival' });
+    expect(citizen.action?.phase).toBe('travel');
+    citizen.inventory['axe:2'] = 1;
+    tickWorld(world, BALANCE.moveTicks);
+    expect(citizen.action?.phase).toBe('work');
+    expect(citizen.action?.duration).toBe(20);
+    citizen.inventory['axe:3'] = 1;
+    tickWorld(world);
+    expect(citizen.action?.duration).toBe(20);
+  });
+
+  it('allows selling an active tool without recapturing the work duration', () => {
+    const { world, citizen } = fixture();
+    const node = deposit(world);
+    citizen.x = node.x;
+    citizen.y = node.y;
+    citizen.inventory['axe:1'] = 1;
+    send(world, citizen, { type: 'harvest', depositId: node.id });
+    expect(citizen.action?.duration).toBe(20);
     send(world, citizen, { type: 'order', side: 'sell', item: 'axe:1', quantity: 1, price: 5 });
     expect(citizen.inventory['axe:1']).toBeUndefined();
-    expect(dispatch(world, citizen.id, { type: 'equip', item: 'axe:1' }).code).toBe(
-      'missing-equipment',
-    );
+    tickWorld(world);
+    expect(citizen.action?.duration).toBe(20);
   });
 
   it('reserves recipe inputs once, excludes meals/sales, and refunds on interruption', () => {
@@ -305,7 +419,6 @@ describe('foundational world', () => {
     expect(citizen.inventory['knife:1']).toBeUndefined();
     tickWorld(world, 10);
     expect(citizen.inventory).toEqual({ 'wood:2': 1, 'knife:1': 1 });
-    expect(citizen.equipment).toEqual({});
   });
 
   it('constructs with travel and reserved footprints, then operates owner-only stations', () => {
@@ -528,12 +641,10 @@ describe('foundational world', () => {
     gather(world, citizen, 'fibre', 1, 3);
     send(world, citizen, { type: 'craft', item: 'knife', tier: 1 });
     settle(world, citizen);
-    send(world, citizen, { type: 'equip', item: 'knife:1' });
     gather(world, citizen, 'food', 1, 6);
     gather(world, citizen, 'fibre', 1, 3);
     send(world, citizen, { type: 'craft', item: 'axe', tier: 1 });
     settle(world, citizen);
-    send(world, citizen, { type: 'equip', item: 'axe:1' });
     gather(world, citizen, 'wood', 1, 9);
     gather(world, citizen, 'fibre', 1, 4);
     send(world, citizen, {
@@ -547,15 +658,14 @@ describe('foundational world', () => {
     send(world, citizen, { type: 'refine', buildingId: first.id, fromTier: 1 });
     settle(world, citizen);
     expect(citizen.inventory['wood:2']).toBe(1);
-    gather(world, citizen, 'wood', 2, 3);
-    gather(world, citizen, 'food', 2, 3);
+    gather(world, citizen, 'wood', 2, 6);
+    gather(world, citizen, 'food', 2, 6);
     send(world, citizen, { type: 'craft', item: 'scythe', tier: 2 });
     settle(world, citizen);
-    send(world, citizen, { type: 'equip', item: 'scythe:2' });
     gather(world, citizen, 'fibre', 3, 1);
     expect(citizen.inventory['fibre:3']).toBe(1);
-    gather(world, citizen, 'wood', 2, 9);
-    gather(world, citizen, 'fibre', 2, 4);
+    gather(world, citizen, 'wood', 2, 15);
+    gather(world, citizen, 'fibre', 2, 8);
     send(world, citizen, {
       type: 'build',
       kind: 'lumbermill',
@@ -568,7 +678,8 @@ describe('foundational world', () => {
     settle(world, citizen);
     expect(citizen.inventory['wood:3']).toBe(1);
     expect(citizen.health).toBeGreaterThan(0);
-    expect(Object.values(world.citizens).reduce((sum, c) => sum + c.gold, 0)).toBe(
+    expect(Object.values(world.citizens).reduce((sum, c) => sum + c.gold, 0) +
+      Object.values(world.loot).reduce((sum, loot) => sum + loot.gold, 0)).toBe(
       world.initialGold,
     );
   });

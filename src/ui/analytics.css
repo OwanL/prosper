@@ -1,0 +1,121 @@
+.analytics-panel {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 24px;
+  background: #101b29;
+  color: #e4edf5;
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+}
+.analytics-panel *,
+.analytics-panel *::before,
+.analytics-panel *::after {
+  box-sizing: border-box;
+}
+.analytics-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.analytics-heading h2 {
+  font-size: 22px;
+  margin: 3px 0 0;
+  font-weight: 600;
+}
+.analytics-eyebrow {
+  color: #6bd5cb;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.analytics-tick {
+  color: #b3c3d2;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.analytics-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #344658;
+  padding-bottom: 10px;
+}
+.analytics-tabs button {
+  cursor: pointer;
+  color: #c4d2df;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  font: inherit;
+  padding: 8px 14px;
+}
+.analytics-tabs button[aria-selected='true'] {
+  background: #1b3c45;
+  border-color: #3b777b;
+  color: #abeee7;
+}
+.analytics-panel :focus-visible {
+  outline: 2px solid #6bd5cb;
+  outline-offset: 3px;
+}
+.analytics-description {
+  color: #b3c3d2;
+  margin: 18px 0;
+  max-width: 75ch;
+}
+.analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 22px;
+}
+.analytics-cards > div {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #344658;
+  border-radius: 8px;
+  background: #172637;
+}
+.analytics-cards dt {
+  color: #c4d2df;
+  font-size: 13px;
+}
+.analytics-cards dd {
+  margin: 5px 0;
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.analytics-cards small {
+  display: block;
+  color: #aebfd0;
+  font-size: 12px;
+}
+@media (max-width: 480px) {
+  .analytics-panel {
+    padding: 16px;
+  }
+  .analytics-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .analytics-heading h2 {
+    font-size: 20px;
+  }
+  .analytics-tabs {
+    gap: 3px;
+  }
+  .analytics-tabs button {
+    padding: 8px 10px;
+  }
+  .analytics-cards {
+    gap: 8px;
+  }
+  .analytics-cards > div {
+    padding: 12px;
+  }
+}

@@ -8,13 +8,17 @@ import type {
   World,
   Command,
 } from '../shared/types';
-import { regionAt as worldRegionAt } from '../shared/utils';
+import type { Alliance, TerritorialClaim } from '../shared/autonomy-types';
+import { regionAt as worldRegionAt, ringBoundaries } from '../shared/utils';
 
 export interface SceneCitizen extends CitizenSighting {
   progress?: number;
   thinking?: boolean;
   facing?: number;
   construction?: Extract<Command, { type: 'build' }>;
+  fullness?: number;
+  attackTargetId?: string;
+  partnerId?: string;
 }
 export interface SceneEntity<T> {
   value: T;
@@ -24,12 +28,15 @@ export interface SceneEntity<T> {
 export interface SceneModel {
   width: number;
   height: number;
+  ringCount?: number;
   tick: number;
   citizens: SceneEntity<SceneCitizen>[];
   deposits: SceneEntity<Deposit>[];
   buildings: SceneEntity<Building>[];
   loot: SceneEntity<Pick<Loot, 'id' | 'x' | 'y' | 'citizenName'>>[];
   tiles: { x: number; y: number; seenTick: number; remembered: boolean }[] | null;
+  claims?: TerritorialClaim[];
+  alliances?: Alliance[];
 }
 export function progress(elapsed: number, duration: number): number {
   return duration > 0 ? Math.max(0, Math.min(1, elapsed / duration)) : 0;
@@ -43,8 +50,13 @@ export function projectWorld(world: World, thinking: string[] = []): SceneModel 
   return {
     width: world.width,
     height: world.height,
+    ringCount: world.ringCount,
     tick: world.tick,
     tiles: null,
+    claims: Object.values(world.claims ?? {}).filter(
+      (claim) => claim.expiresTick > world.tick && world.citizens[claim.ownerId]?.alive,
+    ),
+    alliances: Object.values(world.alliances ?? {}),
     citizens: Object.values(world.citizens ?? {})
       .filter((c) => c.alive)
       .map((c) =>
@@ -61,6 +73,10 @@ export function projectWorld(world: World, thinking: string[] = []): SceneModel 
           thinking: thinking.includes(c.id),
           facing: c.action?.path[0] ? (c.action.path[0].x < c.x ? -1 : 1) : 1,
           construction: c.action?.command.type === 'build' ? c.action.command : undefined,
+          attackTargetId:
+            c.action?.command.type === 'attack' ? c.action.command.targetId : undefined,
+          partnerId:
+            c.action?.command.type === 'reproduce' ? c.action.command.partnerId : undefined,
         }),
       ),
     deposits: Object.values(world.deposits ?? {}).map(wrap),
@@ -68,7 +84,8 @@ export function projectWorld(world: World, thinking: string[] = []): SceneModel 
     loot: Object.values(world.loot ?? {}).map(wrap),
   };
 }
-// Only dimensions cross the spectator boundary. No unseen entity is read in this projection.
+// Layout comes from the observation; legacy observations may use dimensions only.
+// No unseen entity or spectator ring metadata is read in this projection.
 export function projectObservation(
   observation: CitizenObservation,
   dimensions: { width: number; height: number },
@@ -91,8 +108,9 @@ export function projectObservation(
     return [...entities.values()];
   };
   return {
-    width: dimensions.width,
-    height: dimensions.height,
+    width: observation.mapSize?.width ?? dimensions.width,
+    height: observation.mapSize?.height ?? dimensions.height,
+    ringCount: observation.mapSize?.ringCount,
     tick: observation.tick,
     tiles,
     citizens: collect((t) => t.citizens),
@@ -111,6 +129,52 @@ export function occupantOffset(id: string, occupants: { id: string }[]): Point {
 export function screenPoint(p: Point, height: number): Point {
   return { x: p.x + 0.5, y: height - p.y - 0.5 };
 }
-export function regionAt(x: number, y: number, width: number, height: number): string {
-  return worldRegionAt({ width, height }, { x, y });
+/** Keep a focused edge citizen in frame without showing empty space outside the map. */
+export function cameraPoint(
+  p: Point,
+  width: number,
+  height: number,
+  mapWidth: number,
+  mapHeight: number,
+): Point {
+  return {
+    x: width >= mapWidth ? mapWidth / 2 : Math.max(width / 2, Math.min(mapWidth - width / 2, p.x)),
+    y:
+      height >= mapHeight
+        ? mapHeight / 2
+        : Math.max(height / 2, Math.min(mapHeight - height / 2, p.y)),
+  };
+}
+/** Exact nested grid rectangles, painted outer-to-inner, replace spectator tile nodes. */
+export function terrainRegions(width: number, height: number, ringCount?: number) {
+  return ringBoundaries({ width, height, ringCount }).map(({ ratio, region }) => {
+    const edge = (size: number) =>
+      ratio === 1 ? 0 : Math.floor((size * (1 - ratio)) / 2 - 0.5) + 1;
+    const x = edge(width),
+      y = edge(height);
+    return {
+      x,
+      y,
+      width: width - 2 * x,
+      height: height - 2 * y,
+      region,
+    };
+  });
+}
+export function regionAt(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  ringCount?: number,
+): string {
+  return worldRegionAt({ width, height, ringCount }, { x, y });
+}
+/** One palette for both spectator rectangles and personally observed tiles. */
+export function terrainColor(region: string, ringCount?: number): string {
+  if (ringCount === undefined)
+    return region === 'center' ? '#b7b384' : region === 'ring1' ? '#9ca97a' : '#83966b';
+  const ring = region === 'center' ? 0 : Number(region.slice(4));
+  const outward = ringCount > 1 ? ring / (ringCount - 1) : 0;
+  return `hsl(${50 + 40 * outward} 24% ${62 - 17 * outward}%)`;
 }

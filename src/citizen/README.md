@@ -1,48 +1,57 @@
-# Citizen runtime integration
+﻿# Citizen runtime integration
+
+The normal model boundary is one structured **policy function**, not an agent dialogue. `CitizenRunner` defaults to compact context and a single `set_policy` response. The continuous controller in `src/world/autonomy.ts` handles ordinary survival, routing, production, markets, local disputes, alliances and family preparation. It keeps working while inference is pending, rejected, unavailable or budget-blocked.
 
 ```ts
-import { CitizenRunner } from './citizen/index.ts';
-import { observe } from './world/observation.ts';
-import { dispatch, tickWorld } from './world/core.ts';
-
 const runner = new CitizenRunner(
   {
-    world: () => world, // closure must point at the current restored world
+    world: () => world,
     observe: (id) => observe(world, id),
-    command: (id, command) => dispatch(world, id, command), // synchronous serialized boundary
-    diagnostic: (record) => diagnostics.write(record), // private structured logs, not citizen knowledge
+    command: (id, command) => dispatch(world, id, command),
+    diagnostic: (record) => diagnostics.write(record),
   },
   { ledgerOptions: { directory: '.prosper-v2', maxRequests: 100, maxTokens: 100_000 } },
 );
 
-// Runtime owns play/pause/time. Never await reasoning in the world tick loop.
 tickWorld(world);
-runner.tick();
-
-// Stop ticks first; invalidate synchronously BEFORE saving/replacing the world.
-runner.interrupt('backend reload');
-await saveCheckpoint(world); // includes nextReviewTick, physical work, goals/memories
-// Recreate runner after restore. Unfinished transcripts are not resumed.
-
-// Explicit opt-in, not a fallback:
-runner.setMode('live');
-const turns = runner.records();
-const { mode, generation, thinking, error } = runner.status();
-const budget = runner.budget();
+updateKnowledge(world);
+runner.tick(); // never await from the physical clock
+runner.setMode('live'); // explicit opt-in; default is local/scripted
+runner.interrupt('reload'); // invalidate before saving/replacing the world
 ```
 
-`startTurn(id, reason?)` is an explicit review override returning a completion promise; concurrent calls for the same citizen return the same promise. `tick()` schedules due living citizens using persisted `nextReviewTick` (default interval 12 ticks, max concurrency 4). Interrupt/mode change invalidates generations, aborts active transports, clears thinking immediately and makes interrupted citizens due for fresh review. It does not cancel physical work or wait for provider cooperation. `setMode('scripted')` is the default mechanical survival/harvest/tool progression demo, explicitly not an emergence/personality evaluation.
+Fresh worlds enable autonomy; mechanics-only `createWorld()` remains opt-in so old saved worlds and explicit fixtures preserve their behavior. Scripted autonomous citizens open no model turns. Local rules can yield aggregate emergence; this does not establish model intelligence.
 
-Recorded mode requires an explicitly imported `recorded: RecordedTurn[]` with `{citizenId, responses: ProviderResponse[]}` per turn. Responses contain optional `content`, `toolCalls: [{id,name,arguments}]`, and `usage: {inputTokens,outputTokens}`. Fixtures are consumed in citizen order; exhaustion is a visible planner failure, never a live fallback. Reproduction of exact historical timing remains the runtime's responsibility: records carry run/turn/request/command identity and application ticks, but fixture mode alone does not replay a whole world.
+## Policy contract
 
-Live requests have a bounded local deadline: `requestTimeoutMs` or `PROSPER_REQUEST_TIMEOUT_MS`, default 120,000ms and maximum 600,000ms. A timed-out request releases the citizen's thinking slot without stopping physical work or refunding uncertain usage. Late receipts may settle accounting, never execute commands.
+`set_policy` accepts required partial `policy`, optional `reviewAfter` (600–10,000 ticks; default 4,800), `memory` (600 characters), at most six goals and two `{text,to?}` communications. Omit `to` for public speech. There are no physical directives or `mode` fields in this surface. Empty policy deliberately continues current rules. Policy fields select livelihood/tier, prices, food reserve, home/territory/no-go areas, stance/aggression/caution, ally/rival preferences and family preference/partner. Prices are bounded and units are documented in context. Omitted fields persist; `home`, `territory` and `partnerId` accept `null` to explicitly clear a commitment. Stored policy never contains null.
 
-Live defaults: local Ollama OpenAI-compatible `http://127.0.0.1:11434/v1/chat/completions`, model `deepseek-v4.1-flash:cloud`, `reasoning_effort: high`, nonstreaming, maximum output 1024 tokens. Context is fresh each turn, retained only within its bounded tool loop (4 requests, 12 tool calls by default). Tools validate exact command shapes before the core validates gameplay; query_tile uses current/dated observation only. Repeated tool call IDs cannot commit twice within a turn. Core commands retain goals and compact notes; no old assistant response is carried forward. No complex memory research or continuity effectiveness claim is made.
+Application validates shape, map bounds and known identities before changing state. A preference cannot create another citizen's consent or invent a bilateral alliance. Physical state is rechecked by the body. Work and attacks use the highest matching positive-count tool tier in carried inventory automatically; there are no equip/unequip commands or separate equipment references. Local changes during inference are expected; a newer explicit policy revision supersedes an older response. Rejected/malformed output preserves local behavior and causes no correction call. Accepted decisions record `policyOutcome: changed|continued`; structural acceptance is not a measure of strategic value.
 
-Private inspector records include exact initial observation, projected request payloads, explicit response content, calls/results, identities, acceptance errors and durations. Hidden provider reasoning, HTTP headers and raw provider failure bodies are omitted. Records retain the latest 100 finished turns plus current active turns; diagnostics receive copies at relevant transitions, so the runtime can durably store them outside world state. Diagnostic exceptions do not stop physical time. Do not expose inspector data as citizen knowledge.
+Compact context includes own needs/personality/goals/policy, bounded personally observed relationships/evidence/delivered social signals, dated symbolic deposit/contact coordinates, public claim/alliance announcements, market summaries and recent private messages/outcomes. Current sightings beat old sightings. Omission counts distinguish bounded memory from a complete history. It never reads peer inventories, private intentions or global unseen resources. A map image/ASCII notebook is not sent. Messages plus schema are capped at 18,000 bytes, with a small request-envelope overhead; personally relevant actors and witnessed harm precede routine trade. Oversized historical core state fails closed. The outer transport additionally has a 128KB hard admission bound.
 
-## Accounting and live-verification limitations
+## Scheduling and providers
 
-The isolated `.prosper-v2/request-ledger.jsonl` ledger reserves synchronously and fsyncs **before** send. It is independent of checkpoints and inspector retention; never delete/reset it as part of scenario/mode changes. Accounting units are request count and tokens, **not dollars**. Input reservation is the entire request's UTF-8 byte count used as a conservative token estimate (not an exact tokenizer); output reservation is max_tokens, including any reasoning counted by the provider in completion usage. Actual valid receipts replace estimates once; absent usage charges the reserved amount. Interrupted unresolved calls remain pending/charged; eventual receipts may settle accounting but cannot execute commands. Failed requests conservatively consume their reservation. Usage above the cap prevents further reservations. Damaged/truncated accounting or a stale lock fails closed; investigate/reconcile manually rather than resetting potentially charged requests. No code touches old `.prosper` data.
+All profiles use one request/review, 1,200 output tokens, concurrency one and a 120-second timeout. The local-model revision supersedes the earlier rare-review recommendation **only for verified local inference**. The runtime must verify exact installed local weights and pass `verifiedLocalModel` equal to the selected model; cloud aliases, mismatches and the OpenAI transport retain the metered profile.
 
-All verification used mocked delayed/failed/completed transports, explicit fixtures, and OS-temp ledger directories. **No actual Ollama/provider calls were made.** Local model availability, cloud authentication, schema/tool-calling compatibility, high-reasoning support, actual tokenizer/usage semantics, provider pricing and ASCII spatial competence remain unverified. No dollar cap or emergence claim is made. If the endpoint does not supply usage, conservative reservations remain the only accounting evidence; cancellation does not establish that billing stopped.
+Verified local inference uses a one-second minimum global send interval, no additional simulation-tick spacing and a 600-send rolling-hour ceiling. Existing citizens and newborns join an initial queue staggered over at most 120 ticks. Successful citizens become eligible for periodic policy reviews every 600 ticks; a reply's longer `reviewAfter` cannot postpone this refresh. The queue prioritizes the oldest actual review attempt, so a repeatedly hungry or threatened actor cannot monopolize it. Single inference throughput means a large population waits longer than 600 ticks for its turn. On the observed machine, approximately seven-second replies naturally limit throughput to roughly 400–500 per hour before other costs. Rejected/unavailable replies wait 600 ticks before reconsideration; there is no correction conversation or retry burst. Local reviews still reserve, record and obey all durable request/token budget caps.
+
+Cloud and unverified providers retain 120 simulation ticks and 30 wall seconds between sends, 30 sends per rolling hour, and sparse eligibility: ordinarily a 4,800-tick check that thriving citizens skip, with a 10,000-tick age fallback. New repeated harm, substantial disputes, failed critical food search, blocked no-go survival or stalled local progress can qualify. Errors back off for at least 4,800 ticks. `startTurn(id)` obeys the same global live guards as scheduled reviews. Fast-forward cannot bypass wall-time or hourly limits in either profile. The continuous controller keeps acting during all inference and backoff periods.
+
+`PROSPER_MODEL` or `options.model` selects an exact model. Compact default is local `qwen3.5:9b`; native `/api/chat` uses `think:false`, `num_ctx:8192`, `num_predict:1200` and constrained JSON. Cloud aliases use `/v1/chat/completions` with reasoning disabled. Ollama Cloud currently does not support JSON-schema constrained generation; application-side validation remains authoritative. A valid plain JSON object is accepted as the same one-pass decision without an extra wrapper call. No automatic downloads or fallback model calls occur.
+
+Options expose model/provider/reasoning settings, review/output/concurrency caps and global tick/wall/hour ceilings for controlled experiments. The UI shows current limits and runner-session token/request counters. Report actual provider usage separately from conservative reservations; requests per citizen-tick are session measurements, not account billing.
+
+## Durable accounting and interruption
+
+The append-only request ledger reserves and fsyncs **before** send. It is independent of checkpoint state, resets and model choice. Reservation timestamps preserve wall/hour guards across backend replacement; locked reservation rechecks rate limits atomically. Defaults are finite lifetime caps of 100 requests and 100,000 tokens. Only explicit operator cap edits change the separate durable settings journal.
+
+Input reservation uses full UTF-8 request bytes as a conservative token estimate, plus maximum output (including provider-counted reasoning). Valid usage settles once; absent usage retains reservation. Interrupted calls remain charged and may later settle without gaining command authority. Provider timeout/cancellation does not prove billing stopped. Damaged/truncated accounting or stale locks fail closed. Never delete a ledger to regain capacity. These are request/token limits, not a dollar cap.
+
+Generation/run checks revoke stale command authority synchronously. Physical work, goals and compact memories remain in the world. Hidden reasoning, credentials, headers and raw error bodies are not copied to diagnostics. Private observations/requests/results are retained in per-run JSONL and must never become citizen knowledge. Browser turn histories are bounded.
+
+## Legacy and recorded compatibility
+
+`contextMode:'legacy'` retains historical `set_strategy`, optional `legacyPlanningTools:true`, primitive commands and correction/query loops for old experiments and regression fixtures. Its prior limits/model are separate from the compact default. `set_strategy` supports keep/append/replace area-based physical directives, with current prerequisites checked during execution and stale discrete-output protections. See implementation/history for exact mechanical contracts.
+
+Recorded mode requires explicit `{citizenId,responses}` fixtures. It never falls back to live; exhaustion is visible. Fixtures establish reproducible responses, not exact historical clock replay or model competence. Ordinary tests use mocked transports/OS-temp ledgers. Real bounded comparison receipts and failures are summarized in [OVERNIGHT](../../docs/spike-2/OVERNIGHT.md).

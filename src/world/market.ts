@@ -1,7 +1,9 @@
 import type { Citizen, Command, CommandResult, Order, World } from '../shared/types.ts';
 import { addInventory, event, fail, id, ok, takeInventory } from '../shared/utils.ts';
+import { CARRIED_ITEM_RE } from '../shared/tiers.ts';
+import { ensureTelemetry, recordTelemetryFill } from './telemetry.ts';
 
-const tradableItem = /^(food|wood|fibre|axe|scythe|knife|sword):[123]$/;
+const tradableItem = CARRIED_ITEM_RE;
 const positiveInteger = (n: number) => Number.isSafeInteger(n) && n > 0;
 const buildingIdFor = (item: string) => (item.startsWith('building:') ? item.slice(9) : null);
 
@@ -53,7 +55,8 @@ function validOrder(world: World, order: Order): boolean {
   );
 }
 
-function match(world: World, incoming: Order): void {
+function match(world: World, incoming: Order): number {
+  let settledGold = 0;
   const candidates = Object.values(world.orders)
     .filter(
       (order) =>
@@ -94,8 +97,10 @@ function match(world: World, incoming: Order): void {
     buy.escrowGold -= quantity * buy.price;
     buyer.gold += quantity * (buy.price - price);
     seller.gold += quantity * price;
+    settledGold += quantity * price;
     buy.quantity -= quantity;
     sell.quantity -= quantity;
+    recordTelemetryFill(world, incoming.item, quantity, price);
     event(world, 'trade', `${quantity} ${incoming.item} sold for ${price} gold each.`, {
       citizenId: buyer.id,
       targetId: seller.id,
@@ -107,6 +112,7 @@ function match(world: World, incoming: Order): void {
       break;
     }
   }
+  return settledGold;
 }
 
 /** Caller serializes this synchronous transaction with ticks and all other commands. */
@@ -125,6 +131,7 @@ export function marketCommand(world: World, citizenId: string, command: Command)
     if (citizen.id !== recipient.id) {
       if (!Number.isSafeInteger(recipient.gold + command.gold))
         return fail('invalid-gold', 'Recipient balance would exceed the integer limit.');
+      ensureTelemetry(world);
       citizen.gold -= command.gold;
       recipient.gold += command.gold;
     }
@@ -134,6 +141,7 @@ export function marketCommand(world: World, citizenId: string, command: Command)
     const order = world.orders[command.orderId];
     if (!order || order.citizenId !== citizenId)
       return fail('unavailable-order', 'Only your own existing orders can be cancelled.');
+    ensureTelemetry(world);
     cancelOrder(world, order);
     return ok('Order cancelled; remaining escrow refunded.');
   }
@@ -174,13 +182,12 @@ export function marketCommand(world: World, citizenId: string, command: Command)
   if (command.side === 'buy' && citizen.gold < total)
     return fail('insufficient-gold', 'Not enough unreserved gold.');
   if (command.side === 'sell' && buildingId === null) {
-    // Work inputs are already removed into Action.reserved by core. Equipment is a
-    // reference to one carried unit, so only that copy is excluded from sale.
-    const equipped = Object.values(citizen.equipment).includes(command.item) ? 1 : 0;
-    if ((citizen.inventory[command.item] ?? 0) - equipped < command.quantity) {
-      return fail('insufficient-items', 'Not enough unreserved, unequipped copies.');
+    // Work inputs are already removed into Action.reserved by core; carried tools are saleable.
+    if ((citizen.inventory[command.item] ?? 0) < command.quantity) {
+      return fail('insufficient-items', 'Not enough unreserved copies.');
     }
   }
+  ensureTelemetry(world);
   const sequence = world.nextId;
   const order: Order = {
     id: id(world, 'order'),
@@ -198,6 +205,21 @@ export function marketCommand(world: World, citizenId: string, command: Command)
   if (command.side === 'buy') citizen.gold -= total;
   else takeInventory(citizen.inventory, order.escrowItems);
   world.orders[order.id] = order;
-  match(world, order);
-  return ok(`Order ${order.id} accepted; ${order.quantity} remaining.`);
+  const settledGold = match(world, order);
+  const filledQuantity = command.quantity - order.quantity;
+  return {
+    ...ok(
+      `Order ${order.id} accepted; ${order.quantity} remaining. Filled ${filledQuantity}/${command.quantity} ${command.item} now; ${command.side === 'buy' ? 'paid' : 'received'} ${settledGold} gold. Remaining quantity is reserved, not delivered.`,
+    ),
+    order: {
+      id: order.id,
+      side: command.side,
+      item: command.item,
+      requestedQuantity: command.quantity,
+      filledQuantity,
+      remainingQuantity: order.quantity,
+      goldPaid: command.side === 'buy' ? settledGold : 0,
+      goldReceived: command.side === 'sell' ? settledGold : 0,
+    },
+  };
 }

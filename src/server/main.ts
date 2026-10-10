@@ -3,6 +3,7 @@ import { createApiServer } from './http.ts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { dataDirectory } from './checkpoint.ts';
+import { verifiedLocalModel } from './local-model.ts';
 
 let runtime: Runtime | undefined;
 let startupError: string | undefined;
@@ -10,7 +11,9 @@ try {
   const restore =
     process.env.PROSPER_RESTORE === '1' ||
     (process.env.PROSPER_RESTORE !== '0' && existsSync(join(dataDirectory(), 'checkpoint.json')));
-  runtime = new Runtime({ restore });
+  const model = process.env.PROSPER_MODEL ?? 'qwen3.5:9b';
+  const localModel = await verifiedLocalModel(model);
+  runtime = new Runtime({ restore, runner: { verifiedLocalModel: localModel } });
 } catch (error) {
   startupError = error instanceof Error ? error.message : String(error);
   console.error(`Restore/startup refused: ${startupError}`);

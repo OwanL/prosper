@@ -1,0 +1,235 @@
+section.economy-view {
+  flex: 0 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-height: var(--economy-max-height, 62dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  container-type: inline-size;
+  font-variant-numeric: tabular-nums;
+}
+.economy-view .economy-heading {
+  gap: 4px 12px;
+}
+.economy-view .eco-snapshot {
+  color: #56624e;
+  font-size: 11px;
+}
+.economy-view .economy-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 6px 0 4px;
+}
+.economy-view .economy-metrics > span {
+  padding: 4px 6px;
+  font-size: 11px;
+  background: #e9eddf;
+  border-radius: 4px;
+}
+.economy-view .economy-metrics b {
+  font-size: 15px;
+}
+.economy-view .eco-block {
+  border-top: 1px solid #d3d8c8;
+  margin-top: 8px;
+  padding-top: 6px;
+}
+.economy-view h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+.economy-view h3 small {
+  display: inline;
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #56624e;
+}
+.economy-view h4 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.economy-view h4 small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #56624e;
+}
+.economy-view .eco-note {
+  margin: 6px 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #56624e;
+}
+.economy-view .eco-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 13px;
+  margin: 4px 0;
+  font-size: 11px;
+}
+.economy-view .eco-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.economy-view .eco-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.economy-view .eco-carried,
+.economy-view .eco-offered {
+  background: #356c56;
+}
+.economy-view .eco-held {
+  background: #ad7522;
+}
+.economy-view .eco-ground {
+  background: #b5c9a1;
+}
+.economy-view .eco-wanted {
+  background: #6775aa;
+}
+.economy-view .eco-work {
+  background: #537c94;
+}
+.economy-view .eco-trade {
+  background: #756390;
+}
+.economy-view .eco-resources {
+  display: grid;
+  gap: 10px;
+}
+.economy-view .eco-resource {
+  min-width: 0;
+}
+.economy-view .eco-stock-row {
+  display: grid;
+  grid-template-columns: 25px minmax(32px, 1fr) minmax(90px, auto);
+  gap: 8px;
+  align-items: center;
+  margin: 3px 0;
+  min-height: 14px;
+}
+.economy-view .eco-stack,
+.economy-view .eco-track {
+  display: flex;
+  height: 10px;
+  border-radius: 2px;
+  background: #e2e6db;
+  overflow: hidden;
+}
+.economy-view .eco-stack > span {
+  flex: none;
+  height: 100%;
+}
+.economy-view .eco-stock-values {
+  text-align: right;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.economy-view .eco-stock-total {
+  display: none;
+}
+.economy-view .eco-bar-row {
+  display: grid;
+  grid-template-columns: minmax(60px, 90px) minmax(30px, 1fr) minmax(25px, auto);
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.economy-view .eco-bar-row > span:first-child {
+  overflow-wrap: anywhere;
+}
+.economy-view .eco-bar-row b {
+  text-align: right;
+  font-size: 11px;
+}
+.economy-view .eco-fill {
+  display: block;
+  height: 100%;
+}
+.economy-view .eco-market-item {
+  margin: 10px 0;
+}
+.economy-view .eco-market-item h4 {
+  margin-bottom: 3px;
+}
+.economy-view .eco-tick-label {
+  font-size: 10px;
+}
+.economy-view details {
+  margin-top: 9px;
+}
+.economy-view summary {
+  padding: 5px 0;
+  font-size: 11px;
+}
+/* Replace the legacy fixed disclosure scroller; the economy panel itself scrolls. */
+.economy-view > details.eco-exact-stock[open] {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+.economy-view table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+  margin: 6px 0;
+}
+.economy-view caption {
+  text-align: left;
+  color: #56624e;
+  padding: 5px 0;
+}
+.economy-view th,
+.economy-view td {
+  padding: 5px 4px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #dce0d3;
+  overflow-wrap: anywhere;
+}
+.economy-view th {
+  font-weight: 600;
+}
+.economy-view thead {
+  background: #e9eddf;
+}
+.economy-view .eco-table-scroll {
+  overflow-x: auto;
+}
+.economy-view .eco-table-scroll table {
+  min-width: 560px;
+  table-layout: auto;
+}
+.economy-view .eco-table-scroll td {
+  white-space: nowrap;
+}
+@container (min-width: 560px) {
+  .economy-view .economy-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .economy-view .eco-resources {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .economy-view .eco-stock-row {
+    grid-template-columns: 22px minmax(24px, 1fr) auto;
+    gap: 4px;
+  }
+  .economy-view .eco-stock-breakdown {
+    display: none;
+  }
+  .economy-view .eco-stock-total {
+    display: inline;
+  }
+}

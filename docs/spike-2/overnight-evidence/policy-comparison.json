@@ -1,0 +1,1010 @@
+{
+  "note": "Exact retained requests/responses and independent per-experiment ledgers remain under .experiments. These copied receipts omit no evidence fields; raw hidden reasoning was never retained.",
+  "experiments": [
+    {
+      "experiment": "policy-2026-10-07T10-57-21-250Z-382879fe",
+      "model": "qwen3.5:9b",
+      "sends": 2,
+      "cases": [
+        {
+          "stage": "livelihood",
+          "citizenId": "citizen-191",
+          "compactContextBytes": 6456,
+          "legacyContextBytes": 25189,
+          "summary": {
+            "accepted": false,
+            "status": "yielded",
+            "stopReason": "request_limit",
+            "usage": {
+              "inputTokens": 2944,
+              "outputTokens": 274
+            },
+            "elapsedMs": 19220,
+            "inferenceTicks": 73,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 22,
+                "y": 24
+              },
+              "stance": "assertive",
+              "aggression": 0.8,
+              "caution": 0.3,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 8,
+              "territory": [
+                18,
+                19,
+                22,
+                23
+              ]
+            },
+            "intent": "Develop knife T2",
+            "newOutcomeCounts": {
+              "command": 332,
+              "meal": 6,
+              "completion": 158,
+              "trade": 3,
+              "claim": 1
+            }
+          }
+        },
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 11230,
+          "legacyContextBytes": 27988,
+          "summary": {
+            "accepted": false,
+            "status": "yielded",
+            "stopReason": "invalid_decision",
+            "usage": {
+              "inputTokens": 2050,
+              "outputTokens": 672
+            },
+            "elapsedMs": 16828,
+            "inferenceTicks": 63,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "cooperative",
+              "aggression": 0.29216224960982795,
+              "caution": 0.2706950112711638,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "avoid",
+              "accessPrice": 0
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "completion": 163,
+              "command": 326,
+              "meal": 10,
+              "trade": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-00-05-903Z-5eef1ef2",
+      "model": "qwen3.5:9b",
+      "sends": 2,
+      "cases": [
+        {
+          "stage": "livelihood",
+          "citizenId": "citizen-191",
+          "compactContextBytes": 6774,
+          "legacyContextBytes": 25189,
+          "summary": {
+            "accepted": false,
+            "status": "error",
+            "elapsedMs": 10750,
+            "inferenceTicks": 41,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 22,
+                "y": 24
+              },
+              "stance": "assertive",
+              "aggression": 0.8,
+              "caution": 0.3,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 8
+            },
+            "intent": "Develop knife T1",
+            "newOutcomeCounts": {
+              "command": 327,
+              "completion": 154,
+              "claim": 2,
+              "alliance": 1,
+              "trade": 8,
+              "meal": 8
+            }
+          }
+        },
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 11548,
+          "legacyContextBytes": 27988,
+          "summary": {
+            "accepted": false,
+            "status": "error",
+            "elapsedMs": 74,
+            "inferenceTicks": 0,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "cooperative",
+              "aggression": 0.29216224960982795,
+              "caution": 0.2706950112711638,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "avoid",
+              "accessPrice": 0
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "command": 332,
+              "completion": 166,
+              "meal": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-04-43-105Z-6e9bfac6",
+      "model": "qwen3.5:9b",
+      "sends": 2,
+      "cases": [
+        {
+          "stage": "livelihood",
+          "citizenId": "citizen-191",
+          "compactContextBytes": 6774,
+          "legacyContextBytes": 25189,
+          "summary": {
+            "accepted": true,
+            "status": "completed",
+            "usage": {
+              "inputTokens": 1625,
+              "outputTokens": 47
+            },
+            "elapsedMs": 2648,
+            "inferenceTicks": 10,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 22,
+                "y": 24
+              },
+              "stance": "assertive",
+              "aggression": 0.8,
+              "caution": 0.3,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 8
+            },
+            "intent": "Develop knife T1",
+            "newOutcomeCounts": {
+              "command": 325,
+              "completion": 158,
+              "claim": 1,
+              "trade": 8,
+              "meal": 8
+            }
+          }
+        },
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 11246,
+          "legacyContextBytes": 27686,
+          "summary": {
+            "accepted": true,
+            "status": "completed",
+            "usage": {
+              "inputTokens": 3192,
+              "outputTokens": 51
+            },
+            "elapsedMs": 3774,
+            "inferenceTicks": 14,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "assertive",
+              "aggression": 0.4,
+              "caution": 0.3,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 5,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "avoid",
+              "accessPrice": 10000
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "command": 331,
+              "completion": 165,
+              "meal": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-05-26-651Z-66af6a40",
+      "model": "deepseek-v4.1-flash:cloud",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 13120,
+          "legacyContextBytes": 29451,
+          "summary": {
+            "accepted": true,
+            "status": "completed",
+            "usage": {
+              "inputTokens": 4763,
+              "outputTokens": 322
+            },
+            "elapsedMs": 2478,
+            "inferenceTicks": 9,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 5,
+                "y": 1
+              },
+              "stance": "cooperative",
+              "aggression": 0.3,
+              "caution": 0.35,
+              "foodReserveTicks": 900,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [
+                "citizen-192",
+                "citizen-195",
+                "citizen-197"
+              ],
+              "rivals": [],
+              "reproduction": "avoid",
+              "accessPrice": 0
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "command": 332,
+              "completion": 166,
+              "meal": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-05-41-879Z-db63939d",
+      "model": "gemma4:31b-cloud",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 13120,
+          "legacyContextBytes": 29451,
+          "summary": {
+            "accepted": false,
+            "status": "yielded",
+            "stopReason": "request_limit",
+            "usage": {
+              "inputTokens": 4543,
+              "outputTokens": 150
+            },
+            "elapsedMs": 2028,
+            "inferenceTicks": 7,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "cooperative",
+              "aggression": 0.29216224960982795,
+              "caution": 0.2706950112711638,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "avoid",
+              "accessPrice": 0
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "command": 332,
+              "completion": 165,
+              "meal": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-11-23-408Z-ef7b446a",
+      "model": "qwen3.5:9b",
+      "sends": 2,
+      "cases": [
+        {
+          "stage": "livelihood",
+          "citizenId": "citizen-191",
+          "compactContextBytes": 6905,
+          "legacyContextBytes": 25189,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 1665,
+              "outputTokens": 122
+            },
+            "elapsedMs": 10587,
+            "inferenceTicks": 40,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 22,
+                "y": 24
+              },
+              "stance": "assertive",
+              "aggression": 0.8,
+              "caution": 0.3,
+              "foodReserveTicks": 700,
+              "sellPrice": 12,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 5
+            },
+            "intent": "Develop knife T1",
+            "newOutcomeCounts": {
+              "command": 328,
+              "completion": 154,
+              "claim": 2,
+              "trade": 8,
+              "meal": 8
+            }
+          }
+        },
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 13273,
+          "legacyContextBytes": 29510,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 3850,
+              "outputTokens": 153
+            },
+            "elapsedMs": 5818,
+            "inferenceTicks": 22,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "assertive",
+              "aggression": 0.65,
+              "caution": 0.4,
+              "foodReserveTicks": 800,
+              "sellPrice": 4,
+              "buyPrice": 3,
+              "allies": [
+                "citizen-197"
+              ],
+              "rivals": [],
+              "reproduction": "seek",
+              "accessPrice": 2
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "completion": 166,
+              "command": 332,
+              "meal": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-11-51-498Z-184a7f68",
+      "model": "gemma4:31b-cloud",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 13273,
+          "legacyContextBytes": 29510,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 4255,
+              "outputTokens": 374
+            },
+            "elapsedMs": 1918,
+            "inferenceTicks": 7,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "cooperative",
+              "aggression": 0.29216224960982795,
+              "caution": 0.2706950112711638,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [
+                "citizen-197"
+              ],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 0
+            },
+            "intent": "Search for food",
+            "newOutcomeCounts": {
+              "command": 332,
+              "completion": 165,
+              "meal": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-11-58-313Z-7e9e5326",
+      "model": "deepseek-v4.1-flash:cloud",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "contested-resources",
+          "citizenId": "citizen-190",
+          "compactContextBytes": 13273,
+          "legacyContextBytes": 29510,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 4301,
+              "outputTokens": 560
+            },
+            "elapsedMs": 2924,
+            "inferenceTicks": 11,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 2,
+              "home": {
+                "x": 19,
+                "y": 1
+              },
+              "stance": "cooperative",
+              "aggression": 0.3,
+              "caution": 0.35,
+              "foodReserveTicks": 900,
+              "sellPrice": 5,
+              "buyPrice": 6,
+              "allies": [
+                "citizen-197",
+                "citizen-195"
+              ],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 0,
+              "territory": [
+                16,
+                1,
+                21,
+                6
+              ]
+            },
+            "intent": "Prepare a willing family",
+            "newOutcomeCounts": {
+              "completion": 164,
+              "command": 332,
+              "trade": 1,
+              "meal": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-22-39-532Z-0a7b392b",
+      "model": "qwen3.5:9b",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "aggrieved-enforcer",
+          "citizenId": "citizen-130",
+          "compactContextBytes": 19686,
+          "legacyContextBytes": 59634,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 6143,
+              "outputTokens": 127
+            },
+            "elapsedMs": 14371,
+            "inferenceTicks": 55,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 19,
+                "y": 18
+              },
+              "stance": "assertive",
+              "aggression": 0.8,
+              "caution": 0.2,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 8,
+              "territory": [
+                8,
+                8,
+                12,
+                12
+              ]
+            },
+            "intent": "Produce food T3",
+            "downstream": {
+              "outcomes": {
+                "command": 1233,
+                "completion": 591,
+                "meal": 18,
+                "trade": 2,
+                "threat": 3,
+                "attack": 2,
+                "flee": 2,
+                "claim": 2
+              },
+              "alive": true,
+              "health": 36.80199600616471,
+              "fullness": 72.60000000000156,
+              "gold": 168,
+              "inventory": {
+                "knife:1": 1,
+                "axe:1": 1,
+                "scythe:1": 1,
+                "knife:2": 1,
+                "knife:3": 1,
+                "sword:2": 1,
+                "food:2": 1,
+                "food:3": 12
+              },
+              "intent": "Produce food T3",
+              "population": 9
+            },
+            "continuation": {
+              "outcomes": {
+                "command": 1233,
+                "completion": 591,
+                "meal": 18,
+                "trade": 2,
+                "threat": 3,
+                "attack": 2,
+                "flee": 2,
+                "claim": 2
+              },
+              "alive": true,
+              "health": 36.80199600616471,
+              "fullness": 72.60000000000156,
+              "gold": 168,
+              "inventory": {
+                "knife:1": 1,
+                "axe:1": 1,
+                "scythe:1": 1,
+                "knife:2": 1,
+                "knife:3": 1,
+                "sword:2": 1,
+                "food:2": 1,
+                "food:3": 12
+              },
+              "intent": "Produce food T3",
+              "population": 9
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-24-18-027Z-36651532",
+      "model": "qwen3.5:9b",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "established-cooperator",
+          "citizenId": "citizen-127",
+          "compactContextBytes": 18404,
+          "legacyContextBytes": 58407,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 5736,
+              "outputTokens": 117
+            },
+            "elapsedMs": 14616,
+            "inferenceTicks": 55,
+            "alive": true,
+            "policy": {
+              "livelihood": "wood",
+              "targetTier": 3,
+              "home": {
+                "x": 10,
+                "y": 2
+              },
+              "stance": "assertive",
+              "aggression": 0.65,
+              "caution": 0.4,
+              "foodReserveTicks": 900,
+              "sellPrice": 18,
+              "buyPrice": 12,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 0,
+              "territory": [
+                7,
+                5,
+                11,
+                9
+              ]
+            },
+            "intent": "Prepare a willing family",
+            "downstream": {
+              "outcomes": {
+                "command": 1253,
+                "completion": 599,
+                "meal": 17,
+                "trade": 2,
+                "threat": 4,
+                "attack": 4,
+                "flee": 4,
+                "claim": 2
+              },
+              "alive": true,
+              "health": 100,
+              "fullness": 83.71111111112268,
+              "gold": 200,
+              "inventory": {
+                "axe:1": 1,
+                "knife:1": 1,
+                "scythe:1": 1,
+                "axe:2": 1,
+                "wood:3": 67,
+                "axe:3": 1,
+                "sword:2": 1,
+                "food:2": 4
+              },
+              "intent": "Prepare a willing family",
+              "population": 9
+            },
+            "continuation": {
+              "outcomes": {
+                "command": 1233,
+                "completion": 591,
+                "meal": 18,
+                "trade": 2,
+                "threat": 3,
+                "attack": 2,
+                "flee": 2,
+                "claim": 2
+              },
+              "alive": true,
+              "health": 100,
+              "fullness": 83.71111111112305,
+              "gold": 200,
+              "inventory": {
+                "axe:1": 1,
+                "knife:1": 1,
+                "scythe:1": 1,
+                "axe:2": 1,
+                "wood:3": 72,
+                "axe:3": 1,
+                "food:2": 4
+              },
+              "intent": "Produce wood T3",
+              "population": 9
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-50-22-411Z-f9ad1496",
+      "model": "qwen3.5:9b",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "late100-bounded-context",
+          "citizenId": "citizen-2105",
+          "compactContextBytes": 15645,
+          "legacyContextBytes": 126733,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "continued",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 4653,
+              "outputTokens": 14
+            },
+            "elapsedMs": 12399,
+            "inferenceTicks": 45,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 85,
+                "y": 14
+              },
+              "stance": "cooperative",
+              "aggression": 0.15737089950125663,
+              "caution": 0.23109870322514325,
+              "foodReserveTicks": 700,
+              "sellPrice": 4,
+              "buyPrice": 6,
+              "allies": [],
+              "rivals": [],
+              "reproduction": "avoid",
+              "accessPrice": 0,
+              "territory": [
+                42,
+                43,
+                46,
+                47
+              ]
+            },
+            "intent": "Unsold food surplus; watch productive ground",
+            "downstream": {
+              "outcomes": {
+                "command": 15000,
+                "completion": 7319,
+                "meal": 330,
+                "trade": 58,
+                "claim": 17,
+                "birth": 2,
+                "alliance": 1
+              },
+              "alive": true,
+              "health": 100,
+              "fullness": 20.900000000001434,
+              "gold": 48,
+              "inventory": {
+                "knife:1": 1,
+                "axe:1": 1,
+                "scythe:1": 1,
+                "knife:2": 1,
+                "axe:2": 1,
+                "knife:3": 1,
+                "food:3": 2
+              },
+              "intent": "Unsold food surplus; watch productive ground",
+              "population": 140
+            },
+            "continuation": {
+              "outcomes": {
+                "command": 15000,
+                "completion": 7319,
+                "meal": 330,
+                "trade": 58,
+                "claim": 17,
+                "birth": 2,
+                "alliance": 1
+              },
+              "alive": true,
+              "health": 100,
+              "fullness": 20.900000000001434,
+              "gold": 48,
+              "inventory": {
+                "knife:1": 1,
+                "axe:1": 1,
+                "scythe:1": 1,
+                "knife:2": 1,
+                "axe:2": 1,
+                "knife:3": 1,
+                "food:3": 2
+              },
+              "intent": "Unsold food surplus; watch productive ground",
+              "population": 140
+            }
+          }
+        }
+      ]
+    },
+    {
+      "experiment": "policy-2026-10-07T11-51-47-244Z-165e796d",
+      "model": "qwen3.5:9b",
+      "sends": 1,
+      "cases": [
+        {
+          "stage": "aggrieved-bounded-policy4",
+          "citizenId": "citizen-128",
+          "compactContextBytes": 15573,
+          "legacyContextBytes": 48353,
+          "summary": {
+            "accepted": true,
+            "policyOutcome": "changed",
+            "status": "completed",
+            "usage": {
+              "inputTokens": 4533,
+              "outputTokens": 196
+            },
+            "elapsedMs": 13863,
+            "inferenceTicks": 52,
+            "alive": true,
+            "policy": {
+              "livelihood": "food",
+              "targetTier": 3,
+              "home": {
+                "x": 12,
+                "y": 7
+              },
+              "stance": "predatory",
+              "aggression": 0.95,
+              "caution": 0.1,
+              "foodReserveTicks": 600,
+              "sellPrice": 4,
+              "buyPrice": 5,
+              "allies": [
+                "citizen-130",
+                "citizen-131",
+                "citizen-127",
+                "citizen-132",
+                "citizen-129",
+                "citizen-1067"
+              ],
+              "rivals": [],
+              "reproduction": "open",
+              "accessPrice": 8,
+              "territory": [
+                10,
+                8,
+                14,
+                12
+              ]
+            },
+            "intent": "Unsold food surplus; watch productive ground",
+            "downstream": {
+              "outcomes": {
+                "command": 613,
+                "completion": 294,
+                "attack": 4,
+                "flee": 1,
+                "trade": 6,
+                "meal": 10,
+                "threat": 2,
+                "extortion": 1
+              },
+              "alive": true,
+              "health": 52.24469299651565,
+              "fullness": 73.27777777778945,
+              "gold": 12,
+              "inventory": {
+                "knife:1": 1,
+                "axe:1": 1,
+                "scythe:1": 1,
+                "food:2": 2,
+                "knife:2": 1,
+                "knife:3": 1,
+                "sword:2": 1,
+                "food:3": 3
+              },
+              "intent": "Unsold food surplus; watch productive ground",
+              "population": 7
+            },
+            "continuation": {
+              "outcomes": {
+                "command": 610,
+                "completion": 294,
+                "attack": 4,
+                "flee": 1,
+                "trade": 6,
+                "meal": 10
+              },
+              "alive": true,
+              "health": 52.24469299651565,
+              "fullness": 73.27777777778945,
+              "gold": 4,
+              "inventory": {
+                "knife:1": 1,
+                "axe:1": 1,
+                "scythe:1": 1,
+                "food:2": 2,
+                "knife:2": 1,
+                "knife:3": 1,
+                "sword:2": 1,
+                "food:3": 3
+              },
+              "intent": "Unsold food surplus; watch productive ground",
+              "population": 7
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -21,8 +21,18 @@ import {
   takeInventory,
 } from '../shared/utils.ts';
 import { BALANCE } from './config.ts';
+import { allocateCitizenName } from './names.ts';
 import { cancelBuildingOrders, cancelCitizenOrders } from './market.ts';
 import { findPath, neighbors, walkable } from './pathfinding.ts';
+import { discardPlan, planActionResult } from './plans.ts';
+import {
+  directiveActionResult,
+  directiveJointActionStarted,
+  discardStrategy,
+} from './directives.ts';
+import { cancelEmergency } from './emergency.ts';
+import { inheritAutonomy } from './autonomy.ts';
+import { highestToolTier } from '../shared/tool-utils.ts';
 
 export const isLifeAction = (command: Command) =>
   ['attack', 'loot', 'reproduce'].includes(command.type);
@@ -59,6 +69,16 @@ export function releaseAction(world: World, citizenId: string, clearQueue = true
     citizen.action = null;
     const partner = action.partnerId ? world.citizens[action.partnerId] : undefined;
     if (partner?.action?.id === action.id && partner.action.partnerId === citizen.id) {
+      planActionResult(
+        partner,
+        action.id,
+        fail('joint-cancelled', 'Joint reproduction cancelled.'),
+      );
+      directiveActionResult(
+        partner,
+        action.id,
+        fail('joint-cancelled', 'Joint reproduction cancelled.'),
+      );
       addInventory(partner.inventory, partner.action.reserved);
       partner.action = null;
       feedback(
@@ -68,7 +88,18 @@ export function releaseAction(world: World, citizenId: string, clearQueue = true
       );
     }
   }
-  if (clearQueue) citizen.queue = [];
+  if (clearQueue) {
+    cancelEmergency(
+      world,
+      citizen,
+      citizen.health <= 0
+        ? 'Death interrupted emergency'
+        : 'Explicit replacement/cancel interrupted emergency',
+    );
+    discardStrategy(world, citizen, 'Strategy cancelled; unused work inputs returned.');
+    citizen.queue = [];
+    discardPlan(world, citizen, 'Approved plan cancelled; unused work inputs returned.');
+  }
 }
 
 /** Called for both attacks and starvation. Escrow and work return BEFORE holdings
@@ -76,6 +107,7 @@ export function releaseAction(world: World, citizenId: string, clearQueue = true
 export function settleDeath(world: World, citizenId: string, killerId?: string): void {
   const citizen = world.citizens[citizenId];
   if (!citizen?.alive) return;
+  cancelEmergency(world, citizen, 'Death interrupted emergency');
   releaseAction(world, citizenId);
   cancelCitizenOrders(world, citizenId);
   citizen.alive = false;
@@ -100,7 +132,6 @@ export function settleDeath(world: World, citizenId: string, killerId?: string):
   }
   citizen.gold = 0;
   citizen.inventory = {};
-  citizen.equipment = {};
   citizen.lastResult = killer
     ? `Killed by ${killer.name}.`
     : 'Died of starvation; holdings remain at the body.';
@@ -261,6 +292,8 @@ export function startLifeAction(
     const cost = foodCost();
     const available = { ...citizen.inventory };
     if (replace && citizen.action) addInventory(available, citizen.action.reserved);
+    if (replace && citizen.emergency?.suspendedAction)
+      addInventory(available, citizen.emergency.suspendedAction.reserved);
     if (!hasInventory(available, cost) || !hasInventory(partner.inventory, cost))
       return fail(
         'parent-food',
@@ -280,6 +313,8 @@ export function startLifeAction(
       path: [],
       partnerId: citizen.id,
     };
+    directiveJointActionStarted(world, citizen);
+    directiveJointActionStarted(world, partner);
     partner.lastResult = `Started joint reproduction with ${citizen.name}.`;
     return ok('Started joint reproduction; both parents occupied and food reserved.');
   }
@@ -312,6 +347,10 @@ export function startLifeAction(
 }
 
 function stop(world: World, citizen: Citizen, result: CommandResult): void {
+  if (citizen.action) {
+    planActionResult(citizen, citizen.action.id, result);
+    directiveActionResult(citizen, citizen.action.id, result);
+  }
   releaseAction(world, citizen.id, false);
   feedback(world, citizen, result);
 }
@@ -413,15 +452,14 @@ function advanceAttack(world: World, citizen: Citizen, action: Action, targetId:
   action.elapsed++;
   if (action.elapsed < action.duration) return;
   action.elapsed = 0;
-  const sword = citizen.equipment.sword;
-  const tier =
-    sword && (citizen.inventory[sword] ?? 0) > 0 ? (Number(sword.split(':')[1]) as 1 | 2 | 3) : 0;
+  const tier=highestToolTier(citizen,'sword') as keyof typeof BALANCE.attackDamage;
   const damage = BALANCE.attackDamage[tier] * (0.5 + random(world));
   target.health = Math.max(0, target.health - damage);
   const building = 'ownerId' in target;
   const audience = [
     citizen.id,
     ...(building ? (target.ownerId ? [target.ownerId] : []) : [target.id]),
+    ...Object.values(world.citizens).filter((witness)=>witness.alive&&distance(witness,target)<=BALANCE.sightRadius).map((witness)=>witness.id),
   ];
   // Property coordinates, never the remote live position of its attacker.
   event(
@@ -433,6 +471,8 @@ function advanceAttack(world: World, citizen: Citizen, action: Action, targetId:
   if (target.health <= 0) {
     if (building) destroyBuilding(world, target, citizen);
     else settleDeath(world, target.id, citizen.id);
+    planActionResult(citizen, action.id, ok(`Defeated ${targetId}.`));
+    directiveActionResult(citizen, action.id, ok(`Defeated ${targetId}.`));
     citizen.action = null;
     feedback(
       world,
@@ -462,10 +502,21 @@ function advanceReproduction(world: World, citizen: Citizen, action: Action): vo
   action.elapsed++;
   partner.action.elapsed = action.elapsed;
   if (action.elapsed < action.duration) return;
+  for (const parent of [citizen, partner]) {
+    planActionResult(parent, action.id, ok('Reproduction completed.'));
+    directiveActionResult(parent, action.id, ok('Reproduction completed.'));
+  }
   citizen.action = null;
   partner.action = null; // Consume both reservations once.
   citizen.reproductionCooldown = partner.reproductionCooldown =
     world.tick + BALANCE.reproductionCooldown;
+  for(const parent of [citizen,partner])if(parent.autonomy) {
+    delete parent.autonomy.meeting;
+    delete parent.autonomy.requestedPartnerId;
+    delete parent.autonomy.familyFoodTarget;
+    parent.autonomy.signals=parent.autonomy.signals?.filter((signal)=>!['family-offer','family-accept','family-ready'].includes(signal.kind));
+    parent.autonomy.intent='Support my family and return to livelihood';
+  }
   delete citizen.consent[partner.id];
   delete partner.consent[citizen.id];
   const childId = id(world, 'citizen');
@@ -477,7 +528,7 @@ function advanceReproduction(world: World, citizen: Citizen, action: Action): vo
   const color = `hsl(${Math.floor(random(world) * 360)}, 55%, 55%)`;
   world.citizens[childId] = {
     id: childId,
-    name: `Citizen ${childId.slice(8)}`,
+    name: allocateCitizenName(world.citizens),
     ...point(citizen),
     color,
     personality: disposition,
@@ -486,7 +537,6 @@ function advanceReproduction(world: World, citizen: Citizen, action: Action): vo
     fullness: BALANCE.newbornFullness,
     gold: 0,
     inventory: {},
-    equipment: {},
     action: null,
     queue: [],
     parents: [citizen.id, partner.id],
@@ -498,6 +548,7 @@ function advanceReproduction(world: World, citizen: Citizen, action: Action): vo
     consent: {},
     reproductionCooldown: 0,
   };
+  inheritAutonomy(world, world.citizens[childId], citizen, partner);
   feedback(world, citizen, ok(`Reproduction completed: ${childId}.`));
   feedback(world, partner, ok(`Reproduction completed: ${childId}.`));
   event(world, 'birth', `${childId} born to ${citizen.id} and ${partner.id}.`, {
@@ -550,6 +601,10 @@ export function advanceLifeAction(world: World, citizen: Citizen): void {
   citizen.gold += body.gold;
   addInventory(citizen.inventory, body.inventory);
   delete world.loot[body.id];
+  if (citizen.action) {
+    planActionResult(citizen, citizen.action.id, ok('Collected all body holdings once.'));
+    directiveActionResult(citizen, citizen.action.id, ok('Collected all body holdings once.'));
+  }
   citizen.action = null;
   feedback(world, citizen, ok('Collected all body holdings once.'));
   event(world, 'loot', 'Body collected.', {

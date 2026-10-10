@@ -4,13 +4,16 @@ import type {
   Citizen,
   Command,
   CommandResult,
-  EquipmentKind,
   Inventory,
   Point,
   Resource,
   Tier,
   World,
 } from '../shared/types.ts';
+import { TIERS } from '../shared/types.ts';
+import { strategyAllowed, validateWorldAuthority, type WorldControlOptions } from './evaluation-authority.ts';
+export type { CitizenAuthority, EvaluationAuthority, WorldControlOptions } from './evaluation-authority.ts';
+import { RING_COUNT, MAX_TIER, CARRIED_ITEM_RE } from '../shared/tiers.ts';
 import {
   addInventory,
   distance,
@@ -21,7 +24,7 @@ import {
   itemKey,
   ok,
   random,
-  regionAt,
+  ringAt,
   takeInventory,
 } from '../shared/utils.ts';
 import {
@@ -35,9 +38,28 @@ import {
   nutrition,
   RESOURCES,
   STATION_RESOURCE,
+  canRefine,
+  refinementRecipe,
+  refinementOutput,
 } from './config.ts';
 import { findPath, inBounds, neighbors, walkable } from './pathfinding.ts';
+import { startingCharacter } from './characters.ts';
+import { LEGACY_FIRST_NAMES } from './name-data.ts';
+import { allocateCitizenName } from './names.ts';
+import { validateKnownCommand } from './observation.ts';
+import { advancePlan, discardPlan, planActionResult } from './plans.ts';
+import {
+  advanceDirectives,
+  directiveActionResult,
+  discardStrategy,
+  isDirectiveGatherRetry,
+} from './directives.ts';
+import { advanceEmergency, beginEmergency } from './emergency.ts';
+import { advanceAutonomy, enableAutonomy, reactAutonomy } from './autonomy.ts';
+import { maintainSociety, witnessHarvest } from './society.ts';
+import { highestToolTier } from '../shared/tool-utils.ts';
 import { isBuildingListed, marketCommand } from './market.ts';
+import { ensureTelemetry, sampleTelemetry } from './telemetry.ts';
 import {
   advanceLifeAction,
   consentCommand,
@@ -58,31 +80,36 @@ const physicalTypes = new Set([
   'loot',
   'reproduce',
 ]);
-const validTier = (tier: number): tier is Tier => tier === 1 || tier === 2 || tier === 3;
+const validTier = (tier: number): tier is Tier => TIERS.includes(tier as Tier);
 const sameTile = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const physical = (command: Command) => physicalTypes.has(command.type);
 const toolTier = (citizen: Citizen, resource: Resource): number => {
-  const key = citizen.equipment[MATCHING_TOOL[resource]];
-  return key && (citizen.inventory[key] ?? 0) > 0 ? Number(key.split(':')[1]) : 0;
+  return highestToolTier(citizen,MATCHING_TOOL[resource]);
 };
 
 /** Seeded, serializable creation. Only this function mints gold. */
 export function createWorld(
-  options: { seed?: number; scenario?: string; runId?: string } = {},
+  options: { seed?: number; scenario?: string; runId?: string; autonomy?: boolean; population?: number } = {},
 ): World {
   const scenario = options.scenario ?? 'village';
   if (!['village', 'competition', 'progression'].includes(scenario))
     throw new Error(`Unknown scenario: ${scenario}`);
   const seed = (options.seed ?? 1) >>> 0;
+  const count = options.population ?? (scenario === 'competition' ? 9 : scenario === 'progression' ? 3 : BALANCE.initialCitizens);
+  if (!Number.isInteger(count) || count < 1 || count > 250) throw new Error('Population must be an integer from 1 to 250.');
+  const scale = Math.max(1, count / BALANCE.initialCitizens);
+  const size = Math.ceil(BALANCE.width * Math.sqrt(scale));
   const world: World = {
     schemaVersion: 1,
     runId: options.runId ?? `run-${seed}-${scenario}`,
+    scenario: scenario as World['scenario'],
     seed,
     rngState: seed || 1,
     nextId: 1,
     tick: 0,
-    width: BALANCE.width,
-    height: BALANCE.height,
+    width: size,
+    height: size,
+    ringCount: RING_COUNT,
     initialGold: 0,
     citizens: {},
     deposits: {},
@@ -92,25 +119,43 @@ export function createWorld(
     messages: [],
     events: [],
   };
-  // Three angular resource areas in each ring, with exact deposit counts. Ring 2
-  // has only 3 T2 deposits out of 72 (4.17%); ring 1 is 75% T2.
-  for (const region of ['ring2', 'ring1', 'center'] as const) {
+  // Each inward band advances one tier, occasionally yielding the next tier.
+  // The rare center tier is not clamped; supported tiers derive from RING_COUNT.
+  for (let ring = RING_COUNT - 1; ring >= 0; ring--) {
     for (let resourceIndex = 0; resourceIndex < RESOURCES.length; resourceIndex++) {
       const pool: Point[] = [];
       for (let y = 0; y < world.height; y++)
         for (let x = 0; x < world.width; x++) {
           const angle = Math.atan2(y - (world.height - 1) / 2, x - (world.width - 1) / 2) + Math.PI;
           const sector = Math.min(2, Math.floor(angle / ((2 * Math.PI) / 3)));
-          if (regionAt(world, { x, y }) === region && sector === resourceIndex) pool.push({ x, y });
+          if (ringAt(world, { x, y }) === ring && sector === resourceIndex) pool.push({ x, y });
         }
       for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(random(world) * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
       }
-      const count = region === 'ring2' ? 24 : region === 'ring1' ? 12 : 6;
-      for (let i = 0; i < Math.min(count, pool.length); i++) {
-        const tier: Tier =
-          region === 'center' ? 3 : region === 'ring1' ? (i < 3 ? 1 : 2) : i === 0 ? 2 : 1;
+      // Sparse groves/fields make access and travel matter. Keep population-
+      // proportional supply, but leave most tiles empty rather than covering
+      // every sector with interchangeable deposits. Separated seeded anchors
+      // provide several local work sites rather than a single compulsory choke.
+      const depositCount = Math.ceil(2.4 * (ring + 1) * scale);
+      const anchors = pool.length ? [pool[0]] : [];
+      const patchCount = Math.min(Math.ceil(depositCount / 5), pool.length);
+      while (anchors.length < patchCount) {
+        let next = pool[0];
+        let farthest = -1;
+        for (const point of pool) {
+          const separation = Math.min(...anchors.map((anchor) => distance(point, anchor)));
+          if (separation > farthest) { farthest = separation; next = point; }
+        }
+        anchors.push(next);
+      }
+      pool.sort((a, b) =>
+        Math.min(...anchors.map((anchor) => distance(a, anchor))) -
+        Math.min(...anchors.map((anchor) => distance(b, anchor))));
+      for (let i = 0; i < Math.min(depositCount, pool.length); i++) {
+        // Keep one base-tier deposit per sector for reliable barehanded starts.
+        const tier = RING_COUNT - ring + (i > 0 && random(world) < 0.05 ? 1 : 0);
         const depositId = id(world, 'deposit');
         world.deposits[depositId] = {
           id: depositId,
@@ -124,14 +169,22 @@ export function createWorld(
       }
     }
   }
-  const count =
-    scenario === 'competition' ? 9 : scenario === 'progression' ? 3 : BALANCE.initialCitizens;
-  const names = ['Ada', 'Bram', 'Cora', 'Dara', 'Eli', 'Faye', 'Galen', 'Hana', 'Ivo'];
-  const personalities = [
-    'Practical and community-minded',
-    'Ambitious and cautious',
-    'Independent and curious',
-  ];
+  // Small outskirts forage patches let newcomers feed themselves before the
+  // cross-sector market develops. The food sector still holds the large fields;
+  // putting every edible plant there stranded unfunded wood/fibre workers.
+  const outskirts = Object.values(world.deposits).filter((deposit) =>
+    deposit.tier === 1 && deposit.resource !== 'food' && ringAt(world, deposit) === RING_COUNT - 1);
+  const occupied = new Set(Object.values(world.deposits).map((deposit) => `${deposit.x},${deposit.y}`));
+  for (let i = 0; i < outskirts.length; i += 3) {
+    const point = neighbors(outskirts[i]).find((candidate) =>
+      inBounds(world, candidate) && ringAt(world, candidate) === RING_COUNT - 1 && !occupied.has(`${candidate.x},${candidate.y}`));
+    if (!point) continue;
+    const depositId = id(world, 'deposit');
+    world.deposits[depositId] = { id: depositId, ...point, resource: 'food', tier: 1,
+      stock: BALANCE.depositCapacity, capacity: BALANCE.depositCapacity, regrowAt: 0 };
+    occupied.add(`${point.x},${point.y}`);
+  }
+  const names = LEGACY_FIRST_NAMES;
   const colors = [
     '#d66a55',
     '#d0a83d',
@@ -143,18 +196,22 @@ export function createWorld(
     '#a09555',
     '#7c86c9',
   ];
+  const spawned = { wood: 0, food: 0, fibre: 0 };
   for (let i = 0; i < count; i++) {
-    const resource = RESOURCES[i % RESOURCES.length];
+    // One citizen in each resource sector; everyone else starts near food supply.
+    const resource = count > 9 ? RESOURCES[i % RESOURCES.length] : i < RESOURCES.length ? RESOURCES[i] : 'food';
     const starts = Object.values(world.deposits).filter(
-      (d) => d.resource === resource && d.tier === 1 && regionAt(world, d) === 'ring2',
+      (d) => d.resource === resource && d.tier === 1 && ringAt(world, d) === RING_COUNT - 1,
     );
-    const start = starts[Math.floor(i / RESOURCES.length) * 7];
+    const index = spawned[resource]++;
+    const sectorPopulation = count > 9 ? Math.ceil((count-RESOURCES.indexOf(resource))/3) : resource === 'food' ? Math.max(1,count - 2) : 1;
+    const start = starts[Math.floor((index * starts.length) / sectorPopulation)];
     const citizenId = id(world, 'citizen');
     world.citizens[citizenId] = {
       id: citizenId,
-      name: names[i],
-      color: colors[i],
-      personality: personalities[i % personalities.length],
+      name: allocateCitizenName(world.citizens),
+      color: colors[i % colors.length],
+      ...startingCharacter(i % names.length),
       x: start.x,
       y: start.y,
       alive: true,
@@ -162,10 +219,8 @@ export function createWorld(
       fullness: BALANCE.maxFullness,
       gold: BALANCE.startingGold,
       inventory: { 'food:1': BALANCE.startingFood },
-      equipment: {},
       action: null,
       queue: [],
-      goals: ['Stay fed', 'Learn a useful trade'],
       memories: [],
       knowledge: {},
       lastResult: 'Ready to gather T1 materials.',
@@ -175,13 +230,52 @@ export function createWorld(
       parents: [],
     };
     world.initialGold += BALANCE.startingGold;
+    if (options.autonomy) enableAutonomy(world, world.citizens[citizenId],count>9?{livelihood:RESOURCES[i%RESOURCES.length]}:{});
   }
+  // A founder needs two discoverable edible sites: one T1 plant's 40 work +
+  // 120 regrowth cycle yields fewer meals than one adult consumes. Do not
+  // guarantee ownership, stock after contention, or rich food at every tile.
+  const provisionedSites = new Set<string>();
+  for (const citizen of Object.values(world.citizens)) {
+    const nearbyFood = () => Object.values(world.deposits).filter((deposit) =>
+      deposit.resource === 'food' && deposit.tier === 1 && distance(deposit, citizen) <= BALANCE.sightRadius &&
+      !provisionedSites.has(deposit.id)).length;
+    const reserveSites = () => {
+      const sites = Object.values(world.deposits).filter((deposit) => deposit.resource === 'food' &&
+        deposit.tier === 1 && distance(deposit, citizen) <= BALANCE.sightRadius && !provisionedSites.has(deposit.id));
+      for (const site of sites.slice(0, 2)) provisionedSites.add(site.id);
+    };
+    if (nearbyFood() >= 2) { reserveSites(); continue; }
+    const candidates: Point[] = [];
+    for (let dx = -BALANCE.sightRadius; dx <= BALANCE.sightRadius; dx++)
+      for (let dy = -BALANCE.sightRadius; dy <= BALANCE.sightRadius; dy++) {
+        const point = { x: citizen.x + dx, y: citizen.y + dy };
+        if (distance(citizen, point) <= BALANCE.sightRadius && inBounds(world, point) &&
+          ringAt(world, point) === RING_COUNT - 1 && !occupied.has(`${point.x},${point.y}`)) candidates.push(point);
+      }
+    candidates.sort((a, b) => distance(citizen, a) - distance(citizen, b));
+    for (const point of candidates) {
+      if (nearbyFood() >= 2) break;
+      const depositId = id(world, 'deposit');
+      world.deposits[depositId] = { id: depositId, ...point, resource: 'food', tier: 1,
+        stock: BALANCE.depositCapacity, capacity: BALANCE.depositCapacity, regrowAt: 0 };
+      occupied.add(`${point.x},${point.y}`);
+    }
+    reserveSites();
+  }
+  ensureTelemetry(world);
   return world;
 }
 
-function report(world: World, citizen: Citizen, result: CommandResult): CommandResult {
+function report(
+  world: World,
+  citizen: Citizen,
+  result: CommandResult,
+  directiveRetry = false,
+): CommandResult {
   citizen.lastResult = result.message;
-  event(world, result.ok ? 'command' : 'error', result.message, {
+  // Retain personal evidence without requesting a model review for executor-owned retries.
+  event(world, directiveRetry ? 'directive' : result.ok ? 'command' : 'error', result.message, {
     citizenId: citizen.id,
     audience: [citizen.id],
   });
@@ -197,7 +291,7 @@ export function cancelAction(world: World, citizenId: string, clearQueue = true)
 function requirements(world: World, citizen: Citizen, command: Command): CommandResult {
   const otherActions = Object.values(world.citizens)
     .filter((c) => c.alive && c.id !== citizen.id)
-    .map((c) => c.action)
+    .flatMap((c) => [c.action, c.emergency?.suspendedAction])
     .filter((a): a is Action => !!a);
   switch (command.type) {
     case 'move':
@@ -215,10 +309,10 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
           'depleted-deposit',
           'Deposit is depleted or reserved; wait for regrowth or choose another.',
         );
-      if (deposit.tier > Math.min(3, toolTier(citizen, deposit.resource) + 1)) {
+      if (deposit.tier > Math.min(MAX_TIER, toolTier(citizen, deposit.resource) + 1)) {
         return fail(
           'tool-required',
-          `Equip a matching ${MATCHING_TOOL[deposit.resource]} of at least T${deposit.tier - 1}.`,
+          `Carry a usable matching tool (${MATCHING_TOOL[deposit.resource]}) of at least T${deposit.tier - 1}.`,
         );
       }
       return ok('Deposit available.');
@@ -226,10 +320,10 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
     case 'craft':
       return EQUIPMENT.includes(command.item) && validTier(command.tier)
         ? ok('Recipe valid.')
-        : fail('invalid-recipe', 'Choose axe, scythe, knife or sword and tier 1, 2 or 3.');
+        : fail('invalid-recipe', `Choose axe, scythe, knife or sword and tier 1 through ${MAX_TIER}.`);
     case 'build': {
       if (!BUILDINGS.includes(command.kind) || !validTier(command.tier))
-        return fail('invalid-building', 'Choose a station or wall and tier 1, 2 or 3.');
+        return fail('invalid-building', `Choose a station or wall and tier 1 through ${MAX_TIER}.`);
       if (!inBounds(world, command))
         return fail('invalid-destination', 'Build at whole coordinates inside the map.');
       if (
@@ -260,13 +354,10 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
         return fail('not-owner', 'Only a station owner can operate it.');
       if (isBuildingListed(world, building.id))
         return fail('listed-station', 'Delist the station before processing.');
-      if (
-        (command.fromTier !== 1 && command.fromTier !== 2) ||
-        (command.fromTier === 2 && building.tier === 1)
-      ) {
+      if (!canRefine(building.tier, command.fromTier, command.direction)) {
         return fail(
           'invalid-refining-tier',
-          'T1 stations process T1; T2/T3 stations process T1 or T2. No T4 output.',
+          `Use an adjacent tier within T1–T${MAX_TIER}: up inputs or down outputs must not exceed the station tier.`,
         );
       }
       return ok('Station available.');
@@ -280,9 +371,7 @@ function costFor(world: World, command: Command): Inventory {
   if (command.type === 'craft') return equipmentRecipe(command.item, command.tier);
   if (command.type === 'build') return buildingRecipe(command.kind, command.tier);
   if (command.type === 'refine')
-    return {
-      [itemKey(STATION_RESOURCE[world.buildings[command.buildingId].kind]!, command.fromTier)]: 3,
-    };
+    return refinementRecipe(STATION_RESOURCE[world.buildings[command.buildingId].kind]!, command.fromTier, command.direction);
   return {};
 }
 function durationFor(world: World, citizen: Citizen, command: Command): number {
@@ -343,6 +432,8 @@ function startAction(
   const reserved = costFor(world, command);
   const available = { ...citizen.inventory };
   if (replace && citizen.action) addInventory(available, citizen.action.reserved);
+  if (replace && citizen.emergency?.suspendedAction)
+    addInventory(available, citizen.emergency.suspendedAction.reserved);
   if (!hasInventory(available, reserved))
     return fail(
       'insufficient-materials',
@@ -365,34 +456,19 @@ function startAction(
   return ok(`Started ${command.type}${route.path.length ? ' with travel' : ''}.`);
 }
 
-function equipmentCommand(world: World, citizen: Citizen, command: Command): CommandResult {
-  if (command.type !== 'equip' && command.type !== 'unequip')
-    return fail('unsupported-command', 'Not an equipment command.');
-  const match =
-    command.type === 'equip' && typeof command.item === 'string'
-      ? /^(axe|scythe|knife|sword):([123])$/.exec(command.item)
-      : null;
-  const kind =
-    command.type === 'unequip' ? command.kind : (match?.[1] as EquipmentKind | undefined);
-  if (!kind || !EQUIPMENT.includes(kind))
-    return fail('invalid-equipment', 'Choose axe, scythe, knife or sword with an exact tier.');
-  const action = citizen.action?.command;
-  const deposit = action?.type === 'harvest' ? world.deposits[action.depositId] : undefined;
-  if (deposit && MATCHING_TOOL[deposit.resource] === kind)
-    return fail('equipment-in-use', 'Cancel harvesting before changing its matching tool.');
-  if (action?.type === 'attack' && kind === 'sword')
-    return fail('equipment-in-use', 'Cancel attacking before changing its sword.');
-  if (command.type === 'equip') {
-    if ((citizen.inventory[command.item] ?? 0) < 1)
-      return fail('missing-equipment', 'That equipment is not in your unreserved inventory.');
-    citizen.equipment[kind] = command.item;
-    return ok(`Equipped ${command.item}; it remains one carried unit.`);
-  }
-  delete citizen.equipment[kind];
-  return ok(`Unequipped ${kind}.`);
-}
-
-export function dispatch(world: World, citizenId: string, command: Command): CommandResult {
+export function dispatch(
+  world: World,
+  citizenId: string,
+  command: Command,
+  source: 'external' | 'plan' | 'directive' = 'external',
+  options?: WorldControlOptions,
+): CommandResult {
+  // The runner owns candidate/setup/scheduled external commands. Controllers
+  // cannot use plan/directive authority to issue competing strategic commands.
+  const strategic = strategyAllowed(citizenId, options);
+  if (source !== 'external' && !strategic)
+    return fail('evaluation-authority', 'Strategic commands are disabled for this citizen.');
+  ensureTelemetry(world);
   const citizen = world.citizens[citizenId];
   if (!citizen?.alive || citizen.health <= 0)
     return fail('unavailable-citizen', 'A living, healthy citizen is required.');
@@ -415,16 +491,12 @@ export function dispatch(world: World, citizenId: string, command: Command): Com
         citizen.queue.push({ ...command });
         result = ok(`Queued ${command.type}; inputs will be checked and reserved when it starts.`);
       }
-    } else result = startAction(world, citizen, command, true);
+    } else result = startAction(world, citizen, command, source === 'external');
   } else {
     switch (command.type) {
       case 'cancel':
         cancelAction(world, citizen.id);
         result = ok('Cancelled physical work and queue; unused inputs returned.');
-        break;
-      case 'equip':
-      case 'unequip':
-        result = equipmentCommand(world, citizen, command);
         break;
       case 'order':
       case 'cancel-order':
@@ -434,6 +506,20 @@ export function dispatch(world: World, citizenId: string, command: Command): Com
       case 'consent':
         result = consentCommand(world, citizen, command);
         break;
+      case 'give': {
+        const recipient=world.citizens[command.citizenId];
+        if(!recipient?.alive||recipient.id===citizen.id)result=fail('invalid-recipient','Choose another living citizen.');
+        else if(distance(citizen,recipient)>1)result=fail('not-adjacent','Reach the recipient before giving carried goods.');
+        else if(!CARRIED_ITEM_RE.test(command.item)||!Number.isSafeInteger(command.quantity)||command.quantity<1)result=fail('invalid-gift','Give a positive whole quantity of an exact carried item and tier.');
+        else if(!hasInventory(citizen.inventory,{[command.item]:command.quantity}))result=fail('insufficient-items','Only unreserved carried goods can be given.');
+        else {
+          takeInventory(citizen.inventory,{[command.item]:command.quantity});
+          addInventory(recipient.inventory,{[command.item]:command.quantity});
+          event(world,'help',`${citizen.name} gave ${recipient.name} ${command.quantity} ${command.item}.`,{citizenId:citizen.id,targetId:recipient.id,x:recipient.x,y:recipient.y,audience:[citizen.id,recipient.id]});
+          result=ok(`Gave ${command.quantity} ${command.item} to ${recipient.name}.`);
+        }
+        break;
+      }
       case 'message': {
         if (
           typeof command.text !== 'string' ||
@@ -506,12 +592,33 @@ export function dispatch(world: World, citizenId: string, command: Command): Com
         result = fail('unsupported-command', 'Unknown command.');
     }
   }
-  return report(world, citizen, result);
+  if (
+    source === 'external' &&
+    result.ok &&
+    (physical(command) || command.type === 'cancel')
+  ) {
+    discardPlan(world, citizen, 'Approved plan superseded by an explicit command.');
+    if (physical(command) || command.type === 'cancel')
+      discardStrategy(world, citizen, 'Strategy superseded by an explicit command.');
+  }
+  return report(
+    world,
+    citizen,
+    result,
+    source === 'directive' && isDirectiveGatherRetry(citizen, command, result),
+  );
 }
 
 function failAction(world: World, citizen: Citizen, result: CommandResult): void {
+  const directiveRetry =
+    !!citizen.action &&
+    isDirectiveGatherRetry(citizen, citizen.action.command, result, citizen.action.id);
+  if (citizen.action) {
+    planActionResult(citizen, citizen.action.id, result);
+    directiveActionResult(citizen, citizen.action.id, result);
+  }
   cancelAction(world, citizen.id, false);
-  report(world, citizen, result);
+  report(world, citizen, result, directiveRetry);
 }
 function finishAction(world: World, citizen: Citizen): void {
   const action = citizen.action!;
@@ -522,6 +629,7 @@ function finishAction(world: World, citizen: Citizen): void {
       deposit.stock--;
       if (deposit.stock < deposit.capacity) deposit.regrowAt = world.tick + BALANCE.regrowTicks;
       addInventory(citizen.inventory, { [itemKey(deposit.resource, deposit.tier)]: 1 });
+      witnessHarvest(world, citizen, deposit);
       break;
     }
     case 'craft':
@@ -546,10 +654,12 @@ function finishAction(world: World, citizen: Citizen): void {
     }
     case 'refine': {
       const resource = STATION_RESOURCE[world.buildings[command.buildingId].kind]!;
-      addInventory(citizen.inventory, { [itemKey(resource, command.fromTier + 1)]: 1 });
+      addInventory(citizen.inventory, refinementOutput(resource, command.fromTier, command.direction));
       break;
     }
   }
+  planActionResult(citizen, action.id, ok(`Completed ${command.type}.`));
+  directiveActionResult(citizen, action.id, ok(`Completed ${command.type}.`));
   citizen.action = null; // Inputs consumed here, never also returned by cancellation.
   report(world, citizen, ok(`Completed ${command.type}.`));
   event(world, 'completion', `Completed ${command.type}.`, {
@@ -626,14 +736,24 @@ function advanceAction(world: World, citizen: Citizen): void {
 function startQueued(world: World, citizen: Citizen): void {
   while (!citizen.action && citizen.queue.length) {
     const command = citizen.queue.shift()!;
-    const result = startAction(world, citizen, command, false);
+    // Submission of an appended plan may use dated knowledge. Never inspect
+    // live prerequisites until the queued target is actually in current sight.
+    const needsTargetSight = ['harvest', 'refine', 'attack', 'loot', 'reproduce'].includes(
+      command.type,
+    );
+    // Build has its own position-based sight guard in startAction; local work
+    // and coordinate movement need no entity projection here.
+    const gate = needsTargetSight
+      ? validateKnownCommand(world, citizen.id, command, 'activation')
+      : ok('No entity sight required.');
+    const result = gate.ok ? startAction(world, citizen, command, false) : gate;
     report(world, citizen, result);
   }
 }
 function sustain(world: World, citizen: Citizen): void {
   citizen.fullness = Math.max(0, citizen.fullness - BALANCE.fullnessDrain);
   // Inputs and market escrow are already removed from available inventory.
-  for (const tier of [1, 2, 3] as const) {
+  for (const tier of TIERS) {
     const key = itemKey('food', tier),
       restored = nutrition(tier);
     if (
@@ -654,13 +774,19 @@ function sustain(world: World, citizen: Citizen): void {
   if (citizen.health <= 0) settleDeath(world, citizen.id);
 }
 
-/** Tick order: regrowth, physical actions, meals/starvation, queued activation.
+/** Tick order: regrowth, physical actions, meals/starvation, queue/plan advancement.
  * Commands and ticks are synchronous; the runtime owns scheduling/generations. */
-export function tickWorld(world: World, count = 1): void {
+export function tickWorld(world: World, count = 1, options?: WorldControlOptions): void {
   if (!Number.isSafeInteger(count) || count < 0)
     throw new Error('Tick count must be a nonnegative whole safe integer.');
+  validateWorldAuthority(world, options);
+  ensureTelemetry(world);
   for (let tick = 0; tick < count; tick++) {
+    // Snapshot membership, not parents or saved fields: only births produced
+    // inside this tick receive the declared newborn authority automatically.
+    const existingCitizens = options?.authority ? new Set(Object.keys(world.citizens)) : undefined;
     world.tick++;
+    maintainSociety(world);
     for (const deposit of Object.values(world.deposits)) {
       if (
         deposit.stock < deposit.capacity &&
@@ -677,10 +803,47 @@ export function tickWorld(world: World, count = 1): void {
         settleDeath(world, citizen.id);
         continue;
       }
+      const strategic = strategyAllowed(citizen.id, options);
+      const emergencyActions = {
+        command: (command: Command) => dispatch(world, citizen.id, command, 'directive', options),
+      };
+      const autonomyActions = { ...emergencyActions, cancel: () => cancelAction(world, citizen.id, false) };
+      if (strategic) {
+        reactAutonomy(world, citizen, autonomyActions, options);
+        if (!citizen.autonomy) beginEmergency(world, citizen, emergencyActions);
+      }
       advanceAction(world, citizen);
       if (!citizen.alive) continue;
       sustain(world, citizen);
-      if (citizen.alive && citizen.health > 0) startQueued(world, citizen);
+      if (citizen.alive && citizen.health > 0) {
+        if (!strategic) {
+          // Candidate queues remain physical work; no emergency, plan or
+          // directive may select additional actions or cancel accepted work.
+          startQueued(world, citizen);
+          continue;
+        }
+        const emergencyOwnedBody = !!citizen.emergency;
+        advanceEmergency(world, citizen, emergencyActions);
+        if (emergencyOwnedBody || citizen.emergency) continue;
+        if (advanceAutonomy(world, citizen, autonomyActions, options)) continue;
+        startQueued(world, citizen);
+        advancePlan(world, citizen, {
+          command: (command) => dispatch(world, citizen.id, command, 'plan', options),
+          cancel: () => cancelAction(world, citizen.id, false),
+        }, options);
+        if (!citizen.plan && !citizen.queue.length)
+          advanceDirectives(world, citizen, {
+            command: (command) => dispatch(world, citizen.id, command, 'directive', options),
+            cancel: () => cancelAction(world, citizen.id, false),
+          }, options);
+      }
     }
+    if (existingCitizens && options?.authority) {
+      for (const citizenId of Object.keys(world.citizens)) {
+        if (!existingCitizens.has(citizenId))
+          options.authority.citizens[citizenId] = options.authority.newbornAuthority ?? 'passive-body';
+      }
+    }
+    sampleTelemetry(world);
   }
 }

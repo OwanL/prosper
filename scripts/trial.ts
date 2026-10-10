@@ -56,6 +56,7 @@ export async function runTrial(options: TrialOptions = {}) {
       },
       {
         mode: 'scripted',
+        contextMode: 'legacy',
         ledger,
         transport: async () => {
           throw new Error('Network forbidden in SCRIPTED trials.');

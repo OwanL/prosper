@@ -1,6 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Citizen, Point } from '../shared/types';
-import { occupantOffset, regionAt, screenPoint, type SceneModel } from './model';
+import type { Citizen, Message, Point, WorldEvent } from '../shared/types';
+import { Tooltip } from './Tooltip';
+import { claimAlliance, contestedOverlaps } from './Conflict';
+import { CitizenMotivation } from './Spectator';
+import { eventPoint, recentStories, storyKinds } from './story';
+import { useDirector } from './useDirector';
+import { useSceneMotion } from './useSceneMotion';
+import { SpeechOverlay } from './SpeechOverlay';
+import './speech.css';
+import './navigation.css';
+import { clampZoom, panViewport, zoomViewport, type Viewport } from './navigation';
+import {
+  cameraPoint,
+  occupantOffset,
+  regionAt,
+  screenPoint,
+  terrainRegions,
+  terrainColor,
+  type SceneModel,
+} from './model';
 
 export function Scene({
   model,
@@ -10,6 +28,17 @@ export function Scene({
   labels,
   running,
   own,
+  messages = [],
+  events = [],
+  focusEvent,
+  director = false,
+  territories = true,
+  resources = false,
+  watch = false,
+  manualCamera = () => {},
+  navigateCamera,
+  focusCitizen,
+  compact = false,
 }: {
   model: SceneModel;
   selected: string;
@@ -18,8 +47,23 @@ export function Scene({
   labels: boolean;
   running: boolean;
   own?: Citizen;
+  messages?: Message[];
+  events?: WorldEvent[];
+  focusEvent?: WorldEvent;
+  director?: boolean;
+  territories?: boolean;
+  resources?: boolean;
+  watch?: boolean;
+  manualCamera?: () => void;
+  navigateCamera?: () => void;
+  focusCitizen?: (id: string) => void;
+  compact?: boolean;
 }) {
   const [zoom, setZoom] = useState(1);
+  const [attacks, setAttacks] = useState(true);
+  const [allClaims, setAllClaims] = useState(false);
+  const alliances = model.alliances ?? [];
+  const overlaps = contestedOverlaps(model.claims ?? [], alliances);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [tile, setTile] = useState<Point | null>(null);
   const previousHealth = useRef(new Map<string, number>());
@@ -38,20 +82,180 @@ export function Scene({
     const timer = setTimeout(() => setHits([]), 400);
     return () => clearTimeout(timer);
   }, [model]);
-  const drag = useRef<{ x: number; y: number; pan: Point } | null>(null);
+  const [manual, setManual] = useState(false);
+  const [cameraRatio, setCameraRatio] = useState<number | null>(null);
+  useEffect(() => {
+    if (follow) setManual(false);
+  }, [follow, selected]);
+  useEffect(() => {
+    if (focusEvent || director) setManual(false);
+  }, [focusEvent, director]);
+  const drag = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    view: Viewport;
+    inverse: DOMMatrix;
+  } | null>(null);
+  const dragged = useRef(false);
   const svg = useRef<SVGSVGElement>(null);
+  const [aspect, setAspect] = useState(1);
+  useEffect(() => {
+    const node = svg.current;
+    if (!node) return;
+    const resize = new ResizeObserver(() => {
+      const box = node.getBoundingClientRect();
+      if (box.width && box.height) setAspect(box.height / box.width);
+    });
+    resize.observe(node);
+    return () => resize.disconnect();
+  }, []);
   const chosen = model.citizens.find((c) => c.value.id === selected && !c.remembered)?.value;
-  const center =
-    follow && chosen
+  const shot = useDirector(
+    events,
+    model.tick,
+    model.width,
+    model.height,
+    director && !model.tiles && !follow && !manual,
+  );
+  const focused = manual ? undefined : (focusEvent ?? shot);
+  const location =
+    focused && !model.tiles ? eventPoint(focused, model.width, model.height) : undefined;
+  const desiredCenter =
+    follow && !manual && chosen
       ? screenPoint(chosen, model.height)
-      : { x: model.width / 2 + pan.x, y: model.height / 2 + pan.y };
-  const vw = model.width / zoom,
-    vh = model.height / zoom;
+      : location
+        ? screenPoint(location, model.height)
+        : { x: model.width / 2 + pan.x, y: model.height / 2 + pan.y };
+  const cinematic = watch && !model.tiles && !!(location || (follow && !manual && chosen));
+  const effectiveZoom = location
+    ? Math.max(zoom, 1.8)
+    : follow && !manual && chosen?.attackTargetId
+      ? Math.max(zoom, 4)
+      : zoom;
+  const vw = model.width / effectiveZoom,
+    vh =
+      manual && cameraRatio !== null
+        ? Math.min(model.height, vw * cameraRatio)
+        : cinematic
+          ? Math.min(model.height / effectiveZoom, vw * aspect)
+          : model.height / effectiveZoom;
+  const center = cameraPoint(desiredCenter, vw, vh, model.width, model.height);
+  const inFrame = (position: Point) => {
+    const screen = screenPoint(position, model.height);
+    return (
+      screen.x >= center.x - vw / 2 - 2 &&
+      screen.x <= center.x + vw / 2 + 2 &&
+      screen.y >= center.y - vh / 2 - 2 &&
+      screen.y <= center.y + vh / 2 + 2
+    );
+  };
+  const depositsInFrame = model.deposits.filter(({ value }) => inFrame(value));
+  const buildingsInFrame = model.buildings.filter(({ value }) => inFrame(value));
+  const lootInFrame = model.loot.filter(({ value }) => inFrame(value));
   const vp = `${center.x - vw / 2} ${center.y - vh / 2} ${vw} ${vh}`;
+  useSceneMotion(
+    svg,
+    model,
+    running,
+    follow && !manual && chosen ? chosen.id : undefined,
+    center,
+    vw,
+    vh,
+  );
+  const presentation = (): Viewport => {
+    const box = svg.current?.viewBox.baseVal;
+    return box
+      ? { x: box.x, y: box.y, width: box.width, height: box.height }
+      : { x: center.x - vw / 2, y: center.y - vh / 2, width: vw, height: vh };
+  };
+  const release = () => {
+    setManual(true);
+    (navigateCamera ?? manualCamera)();
+  };
+  const applyView = (view: Viewport, nextZoom: number) => {
+    release();
+    setZoom(clampZoom(nextZoom));
+    setCameraRatio(view.height / view.width);
+    setPan({
+      x: view.x + view.width / 2 - model.width / 2,
+      y: view.y + view.height / 2 - model.height / 2,
+    });
+  };
+  const changeZoom = (factor: number, anchor?: Point) => {
+    const view = presentation();
+    const nextZoom = clampZoom((model.width / view.width) * factor);
+    applyView(
+      zoomViewport(
+        view,
+        anchor ?? { x: view.x + view.width / 2, y: view.y + view.height / 2 },
+        nextZoom,
+        model.width,
+        model.height,
+      ),
+      nextZoom,
+    );
+  };
+  const fit = () => {
+    release();
+    setZoom(1);
+    setCameraRatio(model.height / model.width);
+    setPan({ x: 0, y: 0 });
+  };
+  const wheelHandler = useRef<(event: WheelEvent) => void>(() => {});
+  wheelHandler.current = (event) => {
+    const matrix = svg.current?.getScreenCTM();
+    if (!matrix) return;
+    event.preventDefault();
+    const anchor = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    const delta =
+      event.deltaY *
+      (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? svg.current!.clientHeight : 1);
+    changeZoom(Math.exp(-Math.max(-100, Math.min(100, delta)) * 0.003), anchor);
+  };
+  useEffect(() => {
+    const node = svg.current;
+    if (!node) return;
+    const wheel = (event: WheelEvent) => wheelHandler.current(event);
+    node.addEventListener('wheel', wheel, { passive: false });
+    return () => node.removeEventListener('wheel', wheel);
+  }, []);
+  // Messages never supply positions or identities: only fresh, living scene sightings do.
+  const live = new Map(
+    model.citizens
+      .filter((c) => !c.remembered && c.value.alive && c.seenTick === model.tick)
+      .map((c) => [c.value.id, c.value]),
+  );
+  const consequential = !model.tiles ? recentStories(events, model.tick, 8) : [];
+  const combat = model.citizens.filter(
+    ({ value, remembered }) => !remembered && value.attackTargetId,
+  );
+  const allyMembership = new Map(
+    (model.alliances ?? []).flatMap((alliance) =>
+      alliance.members.map((id) => [id, alliance] as const),
+    ),
+  );
+  const namesVisible = labels && (model.citizens.length <= 32 || effectiveZoom >= 2);
+  const labelRows = new Map<string, number>();
+  const claimLabelRows = new Map(
+    (model.claims ?? []).map((claim) => {
+      const key = `${Math.floor(claim.areas[0] / 3)},${claim.areas[3]}`;
+      const row = labelRows.get(key) ?? 0;
+      labelRows.set(key, row + 1);
+      return [claim.id, row];
+    }),
+  );
   const point = (p: Point) => {
     const s = screenPoint(p, model.height);
     return `translate(${s.x} ${s.y})`;
   };
+  // Private work permissions belong only to the selected dossier, never other sightings.
+  const strategy =
+    own?.id === selected && own.strategy && ['active', 'blocked'].includes(own.strategy.status)
+      ? own.strategy
+      : undefined;
+  const directive = strategy?.directives[strategy.index];
+  const areas = directive && 'areas' in directive ? directive.areas : [];
   const sight = model.tiles && new Map(model.tiles.map((t) => [`${t.x},${t.y}`, t]));
   const occupants = tile
     ? model.citizens.filter((c) => c.value.x === tile.x && c.value.y === tile.y)
@@ -69,25 +273,108 @@ export function Scene({
     },
   });
   return (
-    <section className="scene-shell" aria-label="World map">
+    <section className={`scene-shell ${watch ? 'watch-scene' : ''}`} aria-label="World map">
       <div className="map-toolbar">
-        <span>◈ {model.tiles ? 'Citizen knowledge · dated sightings' : 'Spectator truth'}</span>
+        <span>
+          ◈{' '}
+          {model.tiles
+            ? 'Citizen knowledge · dated sightings'
+            : director
+              ? 'Director · committed events'
+              : compact
+                ? 'World view'
+                : 'Spectator truth'}
+        </span>
         <div>
-          <button aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.75, z / 1.3))}>
-            −
-          </button>
-          <button
-            aria-label="Reset map view"
-            onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
-            }}
+          {!model.tiles && !compact && (
+            <>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={attacks}
+                  onChange={(e) => setAttacks(e.target.checked)}
+                />
+                Attack arrows
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={allClaims}
+                  onChange={(e) => setAllClaims(e.target.checked)}
+                />
+                All claim labels
+              </label>
+            </>
+          )}
+          {compact && (
+            <details>
+              <summary>Map guide</summary>
+              <section className="game-map-guide">
+                {!model.tiles && (
+                  <>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={attacks}
+                        onChange={(event) => setAttacks(event.target.checked)}
+                      />
+                      Attack arrows
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={allClaims}
+                        onChange={(event) => setAllClaims(event.target.checked)}
+                      />
+                      All claim labels
+                    </label>
+                    <p>
+                      Territory borders are announced demands, not walls. Hatching marks rival
+                      overlap, not confirmed combat.
+                    </p>
+                    <p>
+                      Red arrows show active attack or pursuit. Event rings mark recent recorded
+                      outcomes.
+                    </p>
+                  </>
+                )}
+                <p>
+                  Drag to pan. Scroll to zoom. Select a citizen to inspect them; double-click to
+                  follow.
+                </p>
+                <p>
+                  Focus the map for arrows/WASD, +/− zoom, F/Home fit and Escape to release Follow.
+                </p>
+              </section>
+            </details>
+          )}
+          <Tooltip
+            content={`Show more of the map without changing world state.${effectiveZoom <= 1 ? ' Disabled: minimum zoom reached.' : ''}`}
           >
-            Fit
-          </button>
-          <button aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(5, z * 1.3))}>
-            +
-          </button>
+            <button
+              aria-label="Zoom out"
+              disabled={effectiveZoom <= 1}
+              onClick={() => setZoom(clampZoom(effectiveZoom / 1.3))}
+            >
+              −
+            </button>
+          </Tooltip>
+          <Tooltip content="Fit the whole map and release Follow. Shortcut: F or Home when the map is focused.">
+            <button aria-label="Reset map view" onClick={fit}>
+              Fit
+            </button>
+          </Tooltip>
+          <Tooltip
+            content={`Enlarge sprites and tiles; drag or scroll the map to navigate.${effectiveZoom >= 5 ? ' Disabled: maximum zoom reached.' : ''}`}
+          >
+            <button
+              aria-label="Zoom in"
+              disabled={effectiveZoom >= 5}
+              onClick={() => setZoom(clampZoom(effectiveZoom * 1.3))}
+            >
+              +
+            </button>
+          </Tooltip>
         </div>
       </div>
       <svg
@@ -95,30 +382,110 @@ export function Scene({
         className={`world-scene ${running ? 'running' : 'paused'}`}
         viewBox={vp}
         role="group"
+        tabIndex={0}
         aria-label="Top-down world; north is up, origin is bottom-left"
+        aria-describedby="map-navigation-help"
+        onClickCapture={(e) => {
+          if (dragged.current) {
+            e.stopPropagation();
+            e.preventDefault();
+            dragged.current = false;
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget || e.ctrlKey || e.metaKey || e.altKey) return;
+          const key = e.key.toLowerCase();
+          const directions: Record<string, Point> = {
+            arrowleft: { x: -1, y: 0 },
+            a: { x: -1, y: 0 },
+            arrowright: { x: 1, y: 0 },
+            d: { x: 1, y: 0 },
+            arrowup: { x: 0, y: -1 },
+            w: { x: 0, y: -1 },
+            arrowdown: { x: 0, y: 1 },
+            s: { x: 0, y: 1 },
+          };
+          if (['+', '=', '-', '_', 'f', 'home', 'escape'].includes(key) || directions[key])
+            e.preventDefault();
+          else return;
+          if (key === 'f' || key === 'home') fit();
+          else if (key === '+' || key === '=') changeZoom(1.3);
+          else if (key === '-' || key === '_') changeZoom(1 / 1.3);
+          else {
+            const view = presentation();
+            const direction = directions[key] ?? { x: 0, y: 0 };
+            const distance = e.shiftKey ? 0.3 : 0.08;
+            applyView(
+              panViewport(
+                view,
+                { x: direction.x * view.width * distance, y: direction.y * view.height * distance },
+                model.width,
+                model.height,
+              ),
+              model.width / view.width,
+            );
+          }
+        }}
         data-testid="world-scene"
         onPointerDown={(e) => {
-          if ((e.target as Element).closest('[data-entity-id]')) return;
-          drag.current = { x: e.clientX, y: e.clientY, pan };
+          if (!drag.current) dragged.current = false;
+          if (e.button !== 0 || drag.current || (e.target as Element).closest('[data-entity-id]'))
+            return;
+          const matrix = e.currentTarget.getScreenCTM();
+          if (!matrix) return;
+          e.currentTarget.focus({ preventScroll: true });
+          dragged.current = false;
+          const view = presentation();
+          drag.current = {
+            id: e.pointerId,
+            x: e.clientX,
+            y: e.clientY,
+            view,
+            inverse: matrix.inverse(),
+          };
+          applyView(view, model.width / view.width);
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
-          if (!drag.current || follow) return;
-          const rect = e.currentTarget.getBoundingClientRect();
-          const scale = Math.min(rect.width / vw, rect.height / vh);
-          setPan({
-            x: drag.current.pan.x - (e.clientX - drag.current.x) / scale,
-            y: drag.current.pan.y - (e.clientY - drag.current.y) / scale,
-          });
+          const start = drag.current;
+          if (!start || start.id !== e.pointerId) return;
+          if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 4) dragged.current = true;
+          const a = new DOMPoint(start.x, start.y).matrixTransform(start.inverse);
+          const b = new DOMPoint(e.clientX, e.clientY).matrixTransform(start.inverse);
+          applyView(
+            panViewport(start.view, { x: a.x - b.x, y: a.y - b.y }, model.width, model.height),
+            model.width / start.view.width,
+          );
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          if (drag.current?.id !== e.pointerId) return;
           drag.current = null;
+          if (e.currentTarget.hasPointerCapture(e.pointerId))
+            e.currentTarget.releasePointerCapture(e.pointerId);
         }}
         onPointerCancel={() => {
+          drag.current = null;
+          dragged.current = false;
+        }}
+        onLostPointerCapture={() => {
           drag.current = null;
         }}
       >
         <defs>
+          <marker
+            id="attack-arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto-start-reverse"
+          >
+            <path d="M0 0L10 5L0 10Z" fill="#a52f24" />
+          </marker>
+          <pattern id="contested" width=".4" height=".4" patternUnits="userSpaceOnUse">
+            <path d="M0 .4L.4 0" stroke="#a35320" strokeWidth=".08" />
+          </pattern>
           <pattern id="grass" width="1" height="1" patternUnits="userSpaceOnUse">
             <path
               d="M.1 .8l.05-.1m.5-.3l.04-.08"
@@ -126,17 +493,55 @@ export function Scene({
               strokeWidth=".025"
               opacity=".5"
             />
+            <path d="M0 0H1M0 0V1" stroke="#4e6959" strokeWidth=".025" />
           </pattern>
         </defs>
-        <rect width={model.width} height={model.height} fill="#263e38" />
-        {Array.from({ length: model.width * model.height }, (_, i) => {
-          const x = i % model.width,
-            y = Math.floor(i / model.width);
+        <rect
+          width={model.width}
+          height={model.height}
+          fill="#263e38"
+          onClick={(event) => {
+            const matrix = svg.current?.getScreenCTM();
+            if (!matrix) return;
+            const position = new DOMPoint(event.clientX, event.clientY).matrixTransform(
+              matrix.inverse(),
+            );
+            setTile({ x: Math.floor(position.x), y: model.height - Math.floor(position.y) - 1 });
+          }}
+        />
+        {!model.tiles && (
+          <g
+            data-testid="spectator-terrain"
+            onClick={(event) => {
+              const matrix = svg.current?.getScreenCTM();
+              if (!matrix) return;
+              const position = new DOMPoint(event.clientX, event.clientY).matrixTransform(
+                matrix.inverse(),
+              );
+              setTile({ x: Math.floor(position.x), y: model.height - Math.floor(position.y) - 1 });
+            }}
+          >
+            {terrainRegions(model.width, model.height, model.ringCount).map((area) => (
+              <rect
+                key={area.region}
+                x={area.x}
+                y={area.y}
+                width={area.width}
+                height={area.height}
+                fill={terrainColor(area.region, model.ringCount)}
+              >
+                <title>{area.region}</title>
+              </rect>
+            ))}
+          </g>
+        )}
+        {(model.tiles ?? []).map(({ x, y }) => {
           const known = sight?.get(`${x},${y}`);
           const unseen = sight && !known;
+          const region = regionAt(x, y, model.width, model.height, model.ringCount);
           return (
             <rect
-              key={i}
+              key={`${x},${y}`}
               x={x}
               y={model.height - y - 1}
               width="1"
@@ -146,21 +551,112 @@ export function Scene({
                   ? '#263e38'
                   : known?.remembered
                     ? '#697367'
-                    : regionAt(x, y, model.width, model.height) === 'center'
-                      ? '#b7b384'
-                      : regionAt(x, y, model.width, model.height) === 'ring1'
-                        ? '#9ca97a'
-                        : '#83966b'
+                    : terrainColor(region, model.ringCount)
               }
               stroke="#4e6959"
               strokeWidth=".025"
               onClick={() => setTile({ x, y })}
             >
-              <title>{`(${x}, ${y}) · ${unseen ? 'unseen' : known?.remembered ? `remembered at tick ${known.seenTick}` : regionAt(x, y, model.width, model.height)}`}</title>
+              <title>{`(${x}, ${y}) · ${unseen ? 'unseen' : known?.remembered ? `remembered at tick ${known.seenTick}` : region}`}</title>
             </rect>
           );
         })}
         <rect width={model.width} height={model.height} fill="url(#grass)" pointerEvents="none" />
+        {territories && !model.tiles && (
+          <g
+            className="territory-overlays"
+            pointerEvents="none"
+            aria-label="Public territorial claims, enforced by citizens"
+          >
+            {(model.claims ?? []).map((claim) => {
+              const [x0, y0, x1, y1] = claim.areas;
+              const owner = model.citizens.find(
+                (citizen) => citizen.value.id === claim.ownerId,
+              )?.value;
+              return (
+                <g
+                  key={claim.id}
+                  data-testid={`claim-${claim.id}`}
+                  style={{ color: owner?.color || '#ead085' }}
+                >
+                  <title>{`${
+                    claimAlliance(claim, alliances)
+                      ? `Alliance ${claimAlliance(claim, alliances)!.name} (${claimAlliance(
+                          claim,
+                          alliances,
+                        )!
+                          .members.map(
+                            (id) => model.citizens.find((c) => c.value.id === id)?.value.name ?? id,
+                          )
+                          .join(', ')})`
+                      : owner?.name || claim.ownerId
+                  }: ${claim.stance} ${claim.resource} claim${claim.accessPrice ? `, ${claim.accessPrice} gold access demand` : ''}. Announced demand; citizens can trespass. Expires tick ${claim.expiresTick}.`}</title>
+                  <rect
+                    x={x0 + 0.06}
+                    y={model.height - y1 - 0.94}
+                    width={x1 - x0 + 0.88}
+                    height={y1 - y0 + 0.88}
+                  />
+                </g>
+              );
+            })}
+          </g>
+        )}
+        {territories && !model.tiles && (
+          <g pointerEvents="none" aria-label="Contested rival claim overlaps">
+            {overlaps.map(({ a, b, area: [x0, y0, x1, y1] }) => (
+              <rect
+                key={`${a.id}-${b.id}`}
+                data-testid="contested-overlap"
+                x={x0}
+                y={model.height - y1 - 1}
+                width={x1 - x0 + 1}
+                height={y1 - y0 + 1}
+                fill="url(#contested)"
+              >
+                <title>
+                  Contested rival claims: {a.ownerId} ↔ {b.ownerId}; not confirmed combat
+                </title>
+              </rect>
+            ))}
+          </g>
+        )}
+        {resources && (
+          <g className="resource-overlay" pointerEvents="none" aria-label="Known resource stock">
+            {depositsInFrame.map(({ value: deposit, remembered }) => (
+              <g key={deposit.id} transform={point(deposit)} opacity={remembered ? 0.35 : 1}>
+                <circle
+                  r=".44"
+                  fill={
+                    deposit.resource === 'food'
+                      ? '#f4cd7b'
+                      : deposit.resource === 'wood'
+                        ? '#65c8a6'
+                        : '#b7a8ed'
+                  }
+                  fillOpacity={deposit.stock ? 0.2 : 0.05}
+                  stroke={deposit.stock ? '#fff1c2' : '#725a49'}
+                  strokeWidth=".035"
+                />
+              </g>
+            ))}
+          </g>
+        )}
+        <g
+          className="work-areas"
+          pointerEvents="none"
+          aria-label="Selected citizen work areas, not ownership"
+        >
+          {areas.map(([x0, y0, x1, y1], index) => (
+            <g key={index} data-testid={`work-area-${index + 1}`}>
+              <title>{`Work area ${index + 1}: (${x0}, ${y0})–(${x1}, ${y1}). Work area, not ownership; transit unrestricted`}</title>
+              <rect x={x0} y={model.height - y1 - 1} width={x1 - x0 + 1} height={y1 - y0 + 1} />
+              <text x={x0 + 0.12} y={model.height - y1 - 0.7}>
+                #{index + 1}
+              </text>
+            </g>
+          ))}
+        </g>
         {own?.action && !model.tiles && (
           <g
             className="route"
@@ -181,7 +677,7 @@ export function Scene({
             <title>Intended route, not completed movement</title>
           </g>
         )}
-        {model.deposits.map(({ value: d, remembered, seenTick }) => (
+        {depositsInFrame.map(({ value: d, remembered, seenTick }) => (
           <g
             key={d.id}
             transform={point(d)}
@@ -232,7 +728,7 @@ export function Scene({
             </text>
           </g>
         ))}
-        {model.buildings.map(({ value: b, remembered, seenTick }) => (
+        {buildingsInFrame.map(({ value: b, remembered, seenTick }) => (
           <g
             key={b.id}
             transform={point(b)}
@@ -295,14 +791,14 @@ export function Scene({
             </text>
           </g>
         ))}
-        {model.loot.map(({ value: l, remembered }) => (
+        {lootInFrame.map(({ value: l, remembered }) => (
           <g
             key={l.id}
             transform={point(l)}
             className={remembered ? 'remembered' : ''}
             data-entity-id={l.id}
           >
-            <title>Body / loot: {l.citizenName}</title>
+            <title>{`Body / loot: ${l.citizenName}`}</title>
             <ellipse rx=".28" ry=".13" fill="#746351" />
             <path d="M-.18 0h.36M0-.1v.2" stroke="#ddd3b0" strokeWidth=".05" />
           </g>
@@ -327,9 +823,130 @@ export function Scene({
                 strokeDasharray=".12 .1"
               />
               <path d="M-.3 .25l.6-.5M-.3-.25l.6 .5" stroke="#916e42" strokeWidth=".07" />
-              <title>In-progress {c.construction!.kind} site · not completed</title>
+              <title>{`In-progress ${c.construction!.kind} site · not completed`}</title>
             </g>
           ))}
+        {territories && !model.tiles && (
+          <g className="territory-labels" pointerEvents="none">
+            {(model.claims ?? [])
+              .filter(
+                (claim) =>
+                  allClaims ||
+                  claim.ownerId === selected ||
+                  claimAlliance(claim, alliances)?.members.includes(selected),
+              )
+              .map((claim) => {
+                const owner = model.citizens.find(
+                  (citizen) => citizen.value.id === claim.ownerId,
+                )?.value;
+                return (
+                  <text
+                    key={claim.id}
+                    x={claim.areas[0] + 0.2}
+                    y={
+                      model.height -
+                      claim.areas[3] -
+                      0.65 +
+                      (claimLabelRows.get(claim.id) ?? 0) * 0.23
+                    }
+                  >
+                    {claimAlliance(claim, alliances)
+                      ? `Alliance ${claimAlliance(claim, alliances)!.name}`
+                      : owner?.name || claim.ownerId}{' '}
+                    · {claim.stance === 'toll' ? `${claim.accessPrice}g` : claim.stance}
+                  </text>
+                );
+              })}
+          </g>
+        )}
+        <g
+          className="interaction-links"
+          pointerEvents="none"
+          aria-label="Current combat and reproduction actions"
+        >
+          {attacks &&
+            combat.map(({ value: citizen }) => {
+              const target =
+                live.get(citizen.attackTargetId!) ??
+                model.buildings.find(
+                  (building) =>
+                    !building.remembered && building.value.id === citizen.attackTargetId,
+                )?.value;
+              if (!target) return null;
+              const a = screenPoint(citizen, model.height),
+                b = screenPoint(target, model.height);
+              return (
+                <g key={citizen.id} className="combat-link" data-testid={`combat-${citizen.id}`}>
+                  <title>{`${citizen.name} is ${citizen.activity === 'walking' ? 'pursuing' : 'attacking'} ${'name' in target ? target.name : target.id}. Current confirmed positions.`}</title>
+                  <line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    markerEnd="url(#attack-arrow)"
+                    strokeDasharray={citizen.activity === 'walking' ? '.15 .1' : undefined}
+                  />
+                  <text x={(a.x + b.x) / 2 + 0.16} y={(a.y + b.y) / 2 - 0.2}>
+                    ⚔
+                  </text>
+                </g>
+              );
+            })}
+          {model.citizens
+            .filter(({ value, remembered }) => !remembered && value.partnerId)
+            .map(({ value: citizen }) => {
+              const partner = live.get(citizen.partnerId!);
+              if (!partner || citizen.id.localeCompare(partner.id) > 0) return null;
+              const a = screenPoint(citizen, model.height),
+                b = screenPoint(partner, model.height);
+              return (
+                <g key={`family-${citizen.id}`} className="family-link">
+                  <title>{`${citizen.name} and ${partner.name}: reproduction in progress`}</title>
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+                  <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 0.65}>
+                    ♡
+                  </text>
+                </g>
+              );
+            })}
+        </g>
+        {!model.tiles && (
+          <g className="event-markers" pointerEvents="none" aria-label="Recorded event locations">
+            {consequential
+              .filter((event) => eventPoint(event, model.width, model.height))
+              .slice(0, 5)
+              .map((event) => (
+                <g
+                  key={event.id}
+                  className={`event-marker event-${event.kind}`}
+                  transform={point(eventPoint(event, model.width, model.height)!)}
+                  data-testid={`event-marker-${event.id}`}
+                >
+                  <title>{`${storyKinds[event.kind]!.label} at tick ${event.tick}: ${event.text}. Recorded location.`}</title>
+                  <circle r=".63" />
+                  <text y="-.65">{storyKinds[event.kind]!.icon}</text>
+                </g>
+              ))}
+            {consequential
+              .filter((event) => event.kind === 'trade')
+              .slice(0, 2)
+              .flatMap((event) =>
+                [event.citizenId, event.targetId].map((id) => {
+                  const citizen = id && live.get(id);
+                  return citizen ? (
+                    <g
+                      key={`${event.id}-${id}`}
+                      transform={point(citizen)}
+                      className="trade-marker"
+                    >
+                      <title>{`Remote trade at tick ${event.tick}; ${citizen.name}'s current position, not a meeting or shipment.`}</title>
+                      <text y="-.85">⇄</text>
+                    </g>
+                  ) : null;
+                }),
+              )}
+          </g>
+        )}
         {model.citizens.map(({ value: c, remembered, seenTick }) => {
           const offset = occupantOffset(
             c.id,
@@ -348,20 +965,26 @@ export function Scene({
               role="button"
               tabIndex={0}
               aria-label={`Select ${c.name}${remembered ? `, remembered tick ${seenTick}` : `, ${c.activity}`}`}
+              onDoubleClick={() => {
+                if (!remembered && focusCitizen) {
+                  setManual(false);
+                  focusCitizen(c.id);
+                }
+              }}
               onClick={() => {
+                manualCamera();
                 select(c.id);
                 setTile({ x: c.x, y: c.y });
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  manualCamera();
                   select(c.id);
                 }
               }}
             >
-              <title>
-                {c.name} · ({c.x}, {c.y}) · {remembered ? `last seen tick ${seenTick}` : c.activity}
-              </title>
+              <title>{`${c.name} · (${c.x}, ${c.y}) · ${remembered ? `last seen tick ${seenTick}` : c.activity}`}</title>
               <ellipse
                 className="focus-ring"
                 cy="-.04"
@@ -372,6 +995,21 @@ export function Scene({
                 strokeWidth=".055"
               />
               <ellipse cy=".31" rx=".22" ry=".075" fill="#1d332b" opacity=".35" />
+              {!remembered && territories && allyMembership.has(c.id) && (
+                <circle
+                  r=".39"
+                  fill="none"
+                  stroke={
+                    model.citizens.find(
+                      (citizen) => citizen.value.id === allyMembership.get(c.id)!.members[0],
+                    )?.value.color || '#aed6e4'
+                  }
+                  strokeWidth=".045"
+                  strokeDasharray=".08 .08"
+                >
+                  <title>{allyMembership.get(c.id)!.name}</title>
+                </circle>
+              )}
               {c.id === selected && (
                 <ellipse
                   cy=".28"
@@ -443,9 +1081,14 @@ export function Scene({
                       ···
                     </text>
                   )}
+                  {c.fullness !== undefined && c.fullness < 20 && (
+                    <text x=".35" y="-.4" className="hunger-marker">
+                      <title>Low fullness: under 20 / 100</title>!
+                    </text>
+                  )}
                 </>
               )}
-              {labels && (
+              {(namesVisible || (labels && c.id === selected)) && (
                 <text y=".61" className="nameplate">
                   {c.name}
                   {remembered ? ' ◷' : ''}
@@ -455,9 +1098,87 @@ export function Scene({
           );
         })}
       </svg>
+      <SpeechOverlay svg={svg} model={model} messages={messages} selected={selected} />
+      {watch && own && own.id === selected && !model.tiles && (
+        <CitizenMotivation citizen={own} thinking={!!chosen?.thinking} />
+      )}
+      {focused && location && (
+        <div className={`camera-caption story-${focused.kind}`} data-testid="camera-caption">
+          <b>{storyKinds[focused.kind]?.label ?? focused.kind}</b> · tick {focused.tick} · recorded
+          ({location.x}, {location.y})
+        </div>
+      )}
+      {cinematic && (
+        <Tooltip content="Return to the full world overview. The inset shows confirmed current citizen positions and the camera frame; it never advances the world.">
+          <button className="scene-overview" aria-label="Show world overview" onClick={fit}>
+            <svg
+              viewBox={`0 0 ${model.width} ${model.height}`}
+              role="img"
+              aria-label="World overview and current camera frame"
+            >
+              <rect width={model.width} height={model.height} fill="#4f6d50" />
+              {model.citizens.map(({ value: citizen }) => (
+                <circle
+                  key={citizen.id}
+                  cx={citizen.x + 0.5}
+                  cy={model.height - citizen.y - 0.5}
+                  r={citizen.id === selected ? 0.5 : 0.3}
+                  fill={citizen.id === selected ? '#fff3c1' : citizen.color}
+                />
+              ))}
+              <rect
+                x={center.x - vw / 2}
+                y={center.y - vh / 2}
+                width={vw}
+                height={vh}
+                fill="#fff2a5"
+                fillOpacity=".12"
+                stroke="#fff2a5"
+                strokeWidth=".25"
+              />
+            </svg>
+            <span>Overview</span>
+          </button>
+        </Tooltip>
+      )}
+      {!!areas.length && (
+        <div className="work-area-legend" aria-label="Work area legend">
+          <span>Selected work areas · union, not claims</span>
+          {areas.map(([x0, y0, x1, y1], index) => (
+            <Tooltip
+              key={index}
+              content={`Work area ${index + 1}: (${x0}, ${y0})–(${x1}, ${y1}), inclusive. Work area, not ownership; transit unrestricted`}
+            >
+              <span tabIndex={0}>#{index + 1}</span>
+            </Tooltip>
+          ))}
+        </div>
+      )}
+      {!model.tiles && !compact && (
+        <div className="map-layer-legend">
+          <span>□ Claims: demands, not walls</span>
+          <span>▨ Hatched: rival overlap</span>
+          <span>→ Red arrows: active attack / pursuit</span>
+          <span>⚔ Event rings: recent, not active</span>
+          <span>
+            {allClaims ? 'All claim labels' : 'Claim labels: selected citizen / alliance only'}
+          </span>
+        </div>
+      )}
       <div className="map-footer">
-        <span>↑ North · (0, 0) bottom-left · drag to pan</span>
-        <span>Center / inner ring / outer ring</span>
+        <span id="map-navigation-help" className="map-navigation-help">
+          {compact
+            ? 'Drag to explore · scroll to zoom · select a citizen to see what they’re doing'
+            : 'Drag / scroll · focus map: +/− zoom · F/Home fit · arrows/WASD pan · Shift faster · Esc stop Follow'}
+        </span>
+        <span>
+          {model.citizens.length > 32 && labels && !namesVisible
+            ? 'Crowd view: zoom in for names · '
+            : ''}
+          {territories && !model.tiles
+            ? 'Claims are demands; borders can be crossed'
+            : 'Center / inner ring / outer ring'}
+        </span>
       </div>
       {tile && (
         <div className="tile-inspector" data-testid="tile-inspector">

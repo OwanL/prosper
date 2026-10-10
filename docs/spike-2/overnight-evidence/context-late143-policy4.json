@@ -1,0 +1,1967 @@
+{
+  "source": "C:\\dev\\repos\\prosper\\.experiments\\world-ai\\world-ai-100-9-maintenance-saturation-continuation-snapshot.json",
+  "sha256": "8a8432983d70e1a67b2f74f31d6b53bea933f01326e0b41789dbddad29888fbc",
+  "promptVersion": "prosper-policy-4",
+  "tick": 12000,
+  "population": 143,
+  "providerRequests": 0,
+  "actualProviderTokens": 0,
+  "compactP50": 18021,
+  "compactP95": 18075,
+  "compactMax": 18078,
+  "legacyP50": 126466,
+  "legacyP95": 139198,
+  "samples": [
+    {
+      "citizenId": "citizen-2101",
+      "compactBytes": 18021,
+      "legacyBytes": 125488,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 2,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2102",
+      "compactBytes": 18035,
+      "legacyBytes": 125206,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2103",
+      "compactBytes": 18077,
+      "legacyBytes": 125561,
+      "omissions": {
+        "deposits": 11,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2104",
+      "compactBytes": 18039,
+      "legacyBytes": 134682,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2105",
+      "compactBytes": 18030,
+      "legacyBytes": 134327,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2106",
+      "compactBytes": 17961,
+      "legacyBytes": 130035,
+      "omissions": {
+        "deposits": 16,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2107",
+      "compactBytes": 18034,
+      "legacyBytes": 127604,
+      "omissions": {
+        "deposits": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 8,
+        "socialEvidence": 10,
+        "contacts": 5,
+        "relationships": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2108",
+      "compactBytes": 17988,
+      "legacyBytes": 114776,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 3,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2109",
+      "compactBytes": 18069,
+      "legacyBytes": 138796,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2110",
+      "compactBytes": 18017,
+      "legacyBytes": 119450,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 8,
+        "socialEvidence": 10,
+        "contacts": 5,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2111",
+      "compactBytes": 18041,
+      "legacyBytes": 129186,
+      "omissions": {
+        "deposits": 16,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2112",
+      "compactBytes": 18034,
+      "legacyBytes": 128340,
+      "omissions": {
+        "deposits": 16,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2113",
+      "compactBytes": 18033,
+      "legacyBytes": 123390,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2114",
+      "compactBytes": 18037,
+      "legacyBytes": 119247,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2115",
+      "compactBytes": 18063,
+      "legacyBytes": 129942,
+      "omissions": {
+        "deposits": 7,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2116",
+      "compactBytes": 17978,
+      "legacyBytes": 132950,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2117",
+      "compactBytes": 17961,
+      "legacyBytes": 140403,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2118",
+      "compactBytes": 18009,
+      "legacyBytes": 134413,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 5,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2119",
+      "compactBytes": 17996,
+      "legacyBytes": 123029,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2120",
+      "compactBytes": 18024,
+      "legacyBytes": 129081,
+      "omissions": {
+        "deposits": 13,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 4,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2121",
+      "compactBytes": 18012,
+      "legacyBytes": 133623,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2122",
+      "compactBytes": 18065,
+      "legacyBytes": 139198,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2123",
+      "compactBytes": 18071,
+      "legacyBytes": 131879,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2124",
+      "compactBytes": 17964,
+      "legacyBytes": 137528,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 7,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 1,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2125",
+      "compactBytes": 18076,
+      "legacyBytes": 134455,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10
+      }
+    },
+    {
+      "citizenId": "citizen-2126",
+      "compactBytes": 18030,
+      "legacyBytes": 131988,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2127",
+      "compactBytes": 18014,
+      "legacyBytes": 133482,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2128",
+      "compactBytes": 18067,
+      "legacyBytes": 138392,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 7,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2129",
+      "compactBytes": 18078,
+      "legacyBytes": 136043,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2130",
+      "compactBytes": 18035,
+      "legacyBytes": 126466,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2131",
+      "compactBytes": 18051,
+      "legacyBytes": 127956,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2132",
+      "compactBytes": 18051,
+      "legacyBytes": 136858,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2133",
+      "compactBytes": 18073,
+      "legacyBytes": 105892,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7,
+        "relationships": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2134",
+      "compactBytes": 18031,
+      "legacyBytes": 123702,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 5,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2135",
+      "compactBytes": 18052,
+      "legacyBytes": 134664,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 1,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2136",
+      "compactBytes": 17963,
+      "legacyBytes": 129903,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2137",
+      "compactBytes": 18064,
+      "legacyBytes": 123888,
+      "omissions": {
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2138",
+      "compactBytes": 18013,
+      "legacyBytes": 131476,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2139",
+      "compactBytes": 18047,
+      "legacyBytes": 115580,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2140",
+      "compactBytes": 18071,
+      "legacyBytes": 130750,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 2,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2141",
+      "compactBytes": 18027,
+      "legacyBytes": 131279,
+      "omissions": {
+        "deposits": 8,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2142",
+      "compactBytes": 17950,
+      "legacyBytes": 135833,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2143",
+      "compactBytes": 17977,
+      "legacyBytes": 131072,
+      "omissions": {
+        "deposits": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 3,
+        "socialEvidence": 10,
+        "contacts": 4,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2144",
+      "compactBytes": 18068,
+      "legacyBytes": 131876,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2145",
+      "compactBytes": 18008,
+      "legacyBytes": 138635,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2146",
+      "compactBytes": 17974,
+      "legacyBytes": 129982,
+      "omissions": {
+        "deposits": 6,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 10,
+        "alerts": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2147",
+      "compactBytes": 18034,
+      "legacyBytes": 99393,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2148",
+      "compactBytes": 18039,
+      "legacyBytes": 125941,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2149",
+      "compactBytes": 18050,
+      "legacyBytes": 120545,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "relationships": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2150",
+      "compactBytes": 18025,
+      "legacyBytes": 131105,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2151",
+      "compactBytes": 17965,
+      "legacyBytes": 135362,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2152",
+      "compactBytes": 17986,
+      "legacyBytes": 125930,
+      "omissions": {
+        "deposits": 11,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2153",
+      "compactBytes": 17946,
+      "legacyBytes": 130080,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2154",
+      "compactBytes": 18003,
+      "legacyBytes": 137897,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 8,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 1,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2155",
+      "compactBytes": 17932,
+      "legacyBytes": 120719,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2156",
+      "compactBytes": 17958,
+      "legacyBytes": 123378,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2157",
+      "compactBytes": 17972,
+      "legacyBytes": 126659,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2158",
+      "compactBytes": 17959,
+      "legacyBytes": 119261,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2159",
+      "compactBytes": 18074,
+      "legacyBytes": 110410,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 9
+      }
+    },
+    {
+      "citizenId": "citizen-2160",
+      "compactBytes": 18002,
+      "legacyBytes": 133707,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2161",
+      "compactBytes": 18045,
+      "legacyBytes": 119437,
+      "omissions": {
+        "deposits": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2162",
+      "compactBytes": 18011,
+      "legacyBytes": 132706,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2163",
+      "compactBytes": 18059,
+      "legacyBytes": 122252,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2164",
+      "compactBytes": 17982,
+      "legacyBytes": 112149,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2165",
+      "compactBytes": 18048,
+      "legacyBytes": 106244,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2166",
+      "compactBytes": 18009,
+      "legacyBytes": 139322,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2167",
+      "compactBytes": 18069,
+      "legacyBytes": 123783,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 1,
+        "socialEvidence": 10,
+        "contacts": 1,
+        "relationships": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2168",
+      "compactBytes": 18059,
+      "legacyBytes": 132278,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2169",
+      "compactBytes": 18021,
+      "legacyBytes": 138576,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2170",
+      "compactBytes": 18071,
+      "legacyBytes": 136904,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10
+      }
+    },
+    {
+      "citizenId": "citizen-2171",
+      "compactBytes": 18078,
+      "legacyBytes": 125566,
+      "omissions": {
+        "deposits": 12,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2172",
+      "compactBytes": 18003,
+      "legacyBytes": 133050,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2173",
+      "compactBytes": 17996,
+      "legacyBytes": 121668,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2174",
+      "compactBytes": 18054,
+      "legacyBytes": 130946,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2175",
+      "compactBytes": 18041,
+      "legacyBytes": 116616,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2176",
+      "compactBytes": 17962,
+      "legacyBytes": 142107,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2177",
+      "compactBytes": 18046,
+      "legacyBytes": 114986,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 3,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2178",
+      "compactBytes": 17986,
+      "legacyBytes": 128960,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2179",
+      "compactBytes": 17987,
+      "legacyBytes": 134685,
+      "omissions": {
+        "deposits": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 2,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2180",
+      "compactBytes": 18021,
+      "legacyBytes": 131855,
+      "omissions": {
+        "deposits": 17,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2181",
+      "compactBytes": 18014,
+      "legacyBytes": 124880,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 3
+      }
+    },
+    {
+      "citizenId": "citizen-2182",
+      "compactBytes": 18075,
+      "legacyBytes": 139832,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 9,
+        "alerts": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2183",
+      "compactBytes": 17989,
+      "legacyBytes": 117506,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2184",
+      "compactBytes": 18061,
+      "legacyBytes": 128539,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2185",
+      "compactBytes": 18051,
+      "legacyBytes": 122471,
+      "omissions": {
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 1,
+        "relationships": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2186",
+      "compactBytes": 18014,
+      "legacyBytes": 127509,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2187",
+      "compactBytes": 18073,
+      "legacyBytes": 128086,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2188",
+      "compactBytes": 17941,
+      "legacyBytes": 125160,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 8,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2189",
+      "compactBytes": 18022,
+      "legacyBytes": 121971,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2190",
+      "compactBytes": 17978,
+      "legacyBytes": 107218,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5,
+        "relationships": 4
+      }
+    },
+    {
+      "citizenId": "citizen-2191",
+      "compactBytes": 18005,
+      "legacyBytes": 112396,
+      "omissions": {
+        "deposits": 4,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-2192",
+      "compactBytes": 18077,
+      "legacyBytes": 130655,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 1
+      }
+    },
+    {
+      "citizenId": "citizen-2193",
+      "compactBytes": 18032,
+      "legacyBytes": 134686,
+      "omissions": {
+        "deposits": 12,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8,
+        "relationships": 6,
+        "signals": 2
+      }
+    },
+    {
+      "citizenId": "citizen-2194",
+      "compactBytes": 18068,
+      "legacyBytes": 135893,
+      "omissions": {
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10
+      }
+    },
+    {
+      "citizenId": "citizen-2195",
+      "compactBytes": 18044,
+      "legacyBytes": 131001,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2196",
+      "compactBytes": 17998,
+      "legacyBytes": 127108,
+      "omissions": {
+        "deposits": 9,
+        "buildings": 4,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-2197",
+      "compactBytes": 17963,
+      "legacyBytes": 119574,
+      "omissions": {
+        "deposits": 11,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2198",
+      "compactBytes": 18025,
+      "legacyBytes": 132715,
+      "omissions": {
+        "deposits": 18,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-2199",
+      "compactBytes": 17957,
+      "legacyBytes": 135756,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 5,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 8
+      }
+    },
+    {
+      "citizenId": "citizen-2200",
+      "compactBytes": 18063,
+      "legacyBytes": 142214,
+      "omissions": {
+        "deposits": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 1
+      }
+    },
+    {
+      "citizenId": "citizen-55881",
+      "compactBytes": 18021,
+      "legacyBytes": 122162,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10
+      }
+    },
+    {
+      "citizenId": "citizen-59677",
+      "compactBytes": 18078,
+      "legacyBytes": 123285,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 1
+      }
+    },
+    {
+      "citizenId": "citizen-76088",
+      "compactBytes": 18058,
+      "legacyBytes": 110427,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 4
+      }
+    },
+    {
+      "citizenId": "citizen-129964",
+      "compactBytes": 17949,
+      "legacyBytes": 109652,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 7
+      }
+    },
+    {
+      "citizenId": "citizen-133597",
+      "compactBytes": 17975,
+      "legacyBytes": 130740,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 9
+      }
+    },
+    {
+      "citizenId": "citizen-138276",
+      "compactBytes": 17967,
+      "legacyBytes": 130952,
+      "omissions": {
+        "deposits": 12,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 7
+      }
+    },
+    {
+      "citizenId": "citizen-147648",
+      "compactBytes": 17994,
+      "legacyBytes": 127477,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 9
+      }
+    },
+    {
+      "citizenId": "citizen-154401",
+      "compactBytes": 17980,
+      "legacyBytes": 117113,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 6
+      }
+    },
+    {
+      "citizenId": "citizen-188620",
+      "compactBytes": 17995,
+      "legacyBytes": 135851,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 1,
+        "socialEvidence": 10,
+        "contacts": 3
+      }
+    },
+    {
+      "citizenId": "citizen-192678",
+      "compactBytes": 18003,
+      "legacyBytes": 109939,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 6
+      }
+    },
+    {
+      "citizenId": "citizen-195411",
+      "compactBytes": 17973,
+      "legacyBytes": 154796,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 2
+      }
+    },
+    {
+      "citizenId": "citizen-207592",
+      "compactBytes": 18009,
+      "legacyBytes": 110571,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 7
+      }
+    },
+    {
+      "citizenId": "citizen-220476",
+      "compactBytes": 18045,
+      "legacyBytes": 118442,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 5
+      }
+    },
+    {
+      "citizenId": "citizen-234148",
+      "compactBytes": 18067,
+      "legacyBytes": 117619,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 6
+      }
+    },
+    {
+      "citizenId": "citizen-242706",
+      "compactBytes": 17966,
+      "legacyBytes": 120373,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 3
+      }
+    },
+    {
+      "citizenId": "citizen-242932",
+      "compactBytes": 18071,
+      "legacyBytes": 118803,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 5
+      }
+    },
+    {
+      "citizenId": "citizen-249443",
+      "compactBytes": 18061,
+      "legacyBytes": 113101,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 1,
+        "socialEvidence": 10,
+        "contacts": 2
+      }
+    },
+    {
+      "citizenId": "citizen-256583",
+      "compactBytes": 17987,
+      "legacyBytes": 110407,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8
+      }
+    },
+    {
+      "citizenId": "citizen-288402",
+      "compactBytes": 17966,
+      "legacyBytes": 124707,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 7
+      }
+    },
+    {
+      "citizenId": "citizen-292327",
+      "compactBytes": 18040,
+      "legacyBytes": 108059,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 7
+      }
+    },
+    {
+      "citizenId": "citizen-309272",
+      "compactBytes": 18020,
+      "legacyBytes": 108114,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 3
+      }
+    },
+    {
+      "citizenId": "citizen-312816",
+      "compactBytes": 17980,
+      "legacyBytes": 110532,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 9
+      }
+    },
+    {
+      "citizenId": "citizen-319372",
+      "compactBytes": 17965,
+      "legacyBytes": 110240,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 1
+      }
+    },
+    {
+      "citizenId": "citizen-331625",
+      "compactBytes": 18009,
+      "legacyBytes": 124708,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "contacts": 2
+      }
+    },
+    {
+      "citizenId": "citizen-346023",
+      "compactBytes": 17976,
+      "legacyBytes": 116348,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 5
+      }
+    },
+    {
+      "citizenId": "citizen-356097",
+      "compactBytes": 17957,
+      "legacyBytes": 132197,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 1
+      }
+    },
+    {
+      "citizenId": "citizen-380346",
+      "compactBytes": 18026,
+      "legacyBytes": 110433,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 2,
+        "contacts": 3
+      }
+    },
+    {
+      "citizenId": "citizen-399560",
+      "compactBytes": 17990,
+      "legacyBytes": 109367,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 3
+      }
+    },
+    {
+      "citizenId": "citizen-401240",
+      "compactBytes": 18016,
+      "legacyBytes": 118973,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10,
+        "contacts": 2
+      }
+    },
+    {
+      "citizenId": "citizen-402561",
+      "compactBytes": 17988,
+      "legacyBytes": 114162,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 10
+      }
+    },
+    {
+      "citizenId": "citizen-413402",
+      "compactBytes": 17989,
+      "legacyBytes": 106193,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 3
+      }
+    },
+    {
+      "citizenId": "citizen-417757",
+      "compactBytes": 18063,
+      "legacyBytes": 132487,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 3,
+        "socialEvidence": 7
+      }
+    },
+    {
+      "citizenId": "citizen-422679",
+      "compactBytes": 18071,
+      "legacyBytes": 117979,
+      "omissions": {
+        "deposits": 1,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 5,
+        "socialEvidence": 10
+      }
+    },
+    {
+      "citizenId": "citizen-456731",
+      "compactBytes": 17993,
+      "legacyBytes": 122013,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9
+      }
+    },
+    {
+      "citizenId": "citizen-463757",
+      "compactBytes": 18024,
+      "legacyBytes": 152390,
+      "omissions": {
+        "deposits": 15,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 3,
+        "socialEvidence": 10,
+        "contacts": 5
+      }
+    },
+    {
+      "citizenId": "citizen-482686",
+      "compactBytes": 17986,
+      "legacyBytes": 118049,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "socialEvidence": 9
+      }
+    },
+    {
+      "citizenId": "citizen-483893",
+      "compactBytes": 17964,
+      "legacyBytes": 130739,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 8,
+        "alerts": 5,
+        "socialEvidence": 10,
+        "contacts": 2
+      }
+    },
+    {
+      "citizenId": "citizen-524974",
+      "compactBytes": 17912,
+      "legacyBytes": 110644,
+      "omissions": {
+        "deposits": 3,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 2
+      }
+    },
+    {
+      "citizenId": "citizen-544474",
+      "compactBytes": 18042,
+      "legacyBytes": 105048,
+      "omissions": {
+        "deposits": 6,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 6
+      }
+    },
+    {
+      "citizenId": "citizen-562644",
+      "compactBytes": 18022,
+      "legacyBytes": 93817,
+      "omissions": {
+        "deposits": 11,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 2
+      }
+    },
+    {
+      "citizenId": "citizen-581377",
+      "compactBytes": 17917,
+      "legacyBytes": 72134,
+      "omissions": {
+        "deposits": 2,
+        "claims": 11
+      }
+    },
+    {
+      "citizenId": "citizen-582222",
+      "compactBytes": 18006,
+      "legacyBytes": 109043,
+      "omissions": {
+        "deposits": 2,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 2
+      }
+    },
+    {
+      "citizenId": "citizen-601687",
+      "compactBytes": 18075,
+      "legacyBytes": 93909,
+      "omissions": {
+        "deposits": 11,
+        "buildings": 9,
+        "claims": 12,
+        "alliances": 9,
+        "messages": 1
+      }
+    }
+  ]
+}

@@ -9,6 +9,12 @@ import { ReloadCoordinator, type Backend } from './reload.ts';
 import type { AppSnapshot } from '../src/shared/types.ts';
 
 const directory = dataDirectory();
+const apiPort = Number(process.env.PROSPER_API_PORT ?? 4310);
+const backendPort = Number(process.env.PROSPER_BACKEND_PORT ?? 4312);
+for (const port of [apiPort, backendPort])
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error('Dev ports must be integers in 1..65535.');
+if (apiPort === backendPort) throw new Error('Dev API and backend ports must differ.');
 let state: 'ready' | 'reloading' | 'error' = 'reloading';
 let error: string | undefined;
 let last: AppSnapshot | undefined;
@@ -67,7 +73,7 @@ const coordinator = new ReloadCoordinator({
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: {
         ...process.env,
-        PROSPER_PORT: '4312',
+        PROSPER_PORT: String(backendPort),
         PROSPER_DATA_DIR: directory,
         PROSPER_RESTORE: restore ? '1' : '0',
       },
@@ -152,7 +158,7 @@ const proxy = createServer((incoming, outgoing) => {
   const request = httpRequest(
     {
       hostname: '127.0.0.1',
-      port: 4312,
+      port: backendPort,
       path: incoming.url,
       method: incoming.method,
       headers: incoming.headers,
@@ -185,7 +191,7 @@ const proxy = createServer((incoming, outgoing) => {
   });
   incoming.pipe(request);
 });
-proxy.listen(4310, '127.0.0.1');
+proxy.listen(apiPort, '127.0.0.1');
 proxy.on('error', (e) => {
   console.error(e);
   void shutdown();

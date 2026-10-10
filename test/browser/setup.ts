@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 /** Own the dev supervisor via IPC: its stop handshake cleans up backend and Vite, even on Windows. */
 export default async function setup() {
-  for (const port of [5173, 4310, 4312]) {
+  for (const port of [5193, 5190, 5192]) {
     try {
       await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1000) });
     } catch {
@@ -19,7 +19,13 @@ export default async function setup() {
   const directory = mkdtempSync(join(tmpdir(), 'prosper-browser-data-'));
   const child = spawn(process.execPath, ['--import', 'tsx', resolve('scripts/dev.ts')], {
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-    env: { ...process.env, PROSPER_DATA_DIR: directory },
+    env: {
+      ...process.env,
+      PROSPER_DATA_DIR: directory,
+      PROSPER_UI_PORT: '5193',
+      PROSPER_API_PORT: '5190',
+      PROSPER_BACKEND_PORT: '5192',
+    },
   });
   let failure: Error | undefined;
   child.on('error', (error) => {
@@ -53,7 +59,7 @@ export default async function setup() {
       if (failure) throw failure;
       if (child.exitCode !== null) throw new Error(`Dev supervisor exited: ${child.exitCode}`);
       try {
-        const response = await fetch('http://127.0.0.1:5173/api/state', {
+        const response = await fetch('http://127.0.0.1:5193/api/state', {
           signal: AbortSignal.timeout(3000),
         });
         const snapshot = await response.json();

@@ -1,12 +1,12 @@
 # Spike 2: technical and iteration plan
 
-Implementation status and measured limitations: [LEARNINGS.md](LEARNINGS.md). This document retains the agreed direction; concrete choices are recorded there and in the code.
+Current implementation and measured limitations: [OVERNIGHT.md](OVERNIGHT.md), [citizen.md](citizen.md), and [README](../../README.md). The architecture/reload sections below remain applicable; the implementation sequence records historical spike planning rather than constraints on the overnight redesign.
 
 ## Purpose and authority
 
 Build a small, inspectable simulation with an ergonomic development loop and a game-like browser view. Changing code should not require rebuilding an interesting world or waiting for another live model run to diagnose a failure.
 
-[world.md](world.md) owns the game mechanics. [citizen.md](citizen.md) owns the citizen direction and its research questions. This document proposes the technical architecture and implementation sequence; it does not import mechanics from spike 1.
+[world.md](world.md) owns the game mechanics. [citizen.md](citizen.md) owns the layered citizen direction. The user explicitly authorized borrowing first-spike ideas and automatic local survival. The current architecture adds a continuous local mind beneath rare, one-shot structured model policies; old per-action planning assumptions are superseded.
 
 Confirmed development behavior:
 
@@ -43,7 +43,7 @@ Keep four logical boundaries in the same repository:
 
 There is one serialized boundary for applying world changes. Tools and server controls submit validated commands through it. Asynchronous provider callbacks do not mutate arbitrary world state directly. Tick/action completion and logical transactions have an explicit ordering.
 
-Keep state as plain data. Persist citizen identity, personality, knowledge, goals, memory, inventory/equipment, health/fullness, action queue and progress; deposits, buildings, markets/escrow, bodies/loot, messages, tick, IDs and random-generator state. Persist gameplay-relevant scheduling state explicitly rather than accidentally retaining it in closures.
+Keep state as plain data. Persist citizen identity, personality, knowledge, goals, memory, inventory (including automatically selected tools), health/fullness, action queue and progress; deposits, buildings, markets/escrow, bodies/loot, messages, tick, IDs and random-generator state. Persist gameplay-relevant scheduling state explicitly rather than accidentally retaining it in closures.
 
 Promises, sockets, timers, abort controllers and animation objects are runtime objects and are recreated after restore. They do not belong in a checkpoint. Unfinished model transcripts are not resumed after reload. Diagnostic history is stored separately and remains linked to the run.
 
@@ -168,15 +168,15 @@ Acceptance:
 
 ### Phase B: mechanical world
 
-Implement world.md using centralized, documented balance settings. Add resource/tool/station progression, physical action reservation and cancellation, markets, combat/death/loot, hunger and reproduction in small scenario-tested slices. Do not add spike 1 mechanics absent from world.md.
+Implement world.md using centralized, documented balance settings. Add resource/tool/station progression, physical action reservation and cancellation, markets, combat/death/loot, hunger and reproduction in scenario-tested slices. The current local controller may automatically manage survival, prerequisite production and social reactions under its policy.
 
 Acceptance: initial survival and supply are viable; progression has no circular recipe requirements; inventory/gold/escrow are conserved according to the rules; concurrent harvesting, fills, death and loot cannot duplicate assets. Animate only implemented actions and committed effects.
 
 ### Phase C: citizen harness
 
-Integrate DeepSeek V4.1 Flash with high reasoning, fresh contexts, durable goals/memories, bounded tool execution and actionable errors. Define/test the observation and command semantics before iterating on personality wording. Preserve physical work during inference and planner failures.
+Use rare, single-response structured policies over the continuous local controller. Default optional inference is local Qwen 3.5 9B with thinking disabled; exact configured cloud models are explicit alternatives. Preserve physical work during inference/failure, enforce finite durable budgets and global wall/hour admission, and never add correction calls merely to obtain valid output.
 
-Compare simple memory/continuity alternatives on unfinished goals, changing relationships and interrupted work. Test ASCII coordinate/entity accuracy with the selected model. Record completed actions, errors, latency and tokens; do not score speech or scripted success as spontaneous emergence.
+Compare compact dated symbolic known-world summaries and retained personal evidence on unfinished goals, changing relationships and interrupted work. Record whole-request size, acceptance, meaningful policy changes, downstream outcomes, latency and actual usage. Distinguish authored-rule aggregate emergence from model competence; a valid no-op policy is not a strategic improvement.
 
 ### Phase D: integrated observation
 

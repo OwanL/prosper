@@ -1,0 +1,51 @@
+.prosper-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Disabled native controls still cannot act; their wrapper receives hover/focus. */
+.prosper-tooltip-trigger--disabled {
+  cursor: not-allowed;
+}
+
+.prosper-tooltip-trigger--disabled > :disabled {
+  pointer-events: none;
+}
+
+.prosper-tooltip-trigger--disabled:focus-visible {
+  outline: 3px solid #b98337;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.prosper-tooltip {
+  position: fixed;
+  z-index: 10000;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 8px 11px;
+  border: 1px solid #566c5f;
+  border-radius: 6px;
+  background: #233d34;
+  color: #fffbed;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 20%);
+  font:
+    13px/1.5 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+
+.prosper-tooltip[hidden] {
+  display: none;
+}

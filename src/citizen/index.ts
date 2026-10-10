@@ -12,7 +12,7 @@ export type {
   RequestLedgerOptions,
   RequestBudgetStatus,
 } from './budget.ts';
-export { ollamaTransport } from './provider.ts';
+export { ollamaTransport, ollamaNativeTransport } from './provider.ts';
 export type {
   Transport,
   TransportRequest,

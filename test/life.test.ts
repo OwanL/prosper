@@ -53,17 +53,28 @@ function totalGold(world: World) {
 }
 
 describe('combat and property', () => {
-  it('delays strikes for reaction, locks swords in use, and samples seeded uniform tier damage', () => {
+  it('selects the best available sword on each strike, with escrowed swords excluded', () => {
+    const { world, a, b } = fixture();
+    a.inventory = { 'sword:1': 1, 'sword:3': 1, 'axe:7': 1 };
+    send(world, a, { type: 'attack', targetId: b.id });
+    tickWorld(world, BALANCE.attackTicks);
+    const firstDamage = 100 - b.health + BALANCE.healing;
+    expect(firstDamage).toBeGreaterThanOrEqual(BALANCE.attackDamage[3] * .5);
+    send(world, a, { type: 'order', side: 'sell', item: 'sword:3', quantity: 1, price: 5 });
+    b.health = 100;
+    tickWorld(world, BALANCE.attackTicks);
+    const secondDamage = 100 - b.health + BALANCE.healing;
+    expect(secondDamage).toBeGreaterThanOrEqual(BALANCE.attackDamage[1] * .5);
+    expect(secondDamage).toBeLessThanOrEqual(BALANCE.attackDamage[1] * 1.5);
+    expect(a.action?.command.type).toBe('attack');
+  });
+  it('delays strikes for reaction and samples seeded uniform carried-tool tier damage', () => {
     for (const tier of [0, 1, 2, 3] as const) {
       const { world, a, b } = fixture();
       if (tier) {
         a.inventory[`sword:${tier}`] = 1;
-        send(world, a, { type: 'equip', item: `sword:${tier}` });
       }
       send(world, a, { type: 'attack', targetId: b.id });
-      expect(dispatch(world, a.id, { type: 'unequip', kind: 'sword' }).code).toBe(
-        'equipment-in-use',
-      );
       tickWorld(world, BALANCE.attackTicks - 1);
       expect(b.health).toBe(100);
       tickWorld(world);
@@ -80,7 +91,6 @@ describe('combat and property', () => {
     const unarmed = fixture(),
       armed = fixture();
     armed.a.inventory['sword:3'] = 1;
-    send(armed.world, armed.a, { type: 'equip', item: 'sword:3' });
     send(unarmed.world, unarmed.a, { type: 'attack', targetId: unarmed.b.id });
     send(armed.world, armed.a, { type: 'attack', targetId: armed.b.id });
     tickWorld(unarmed.world, 8);
@@ -193,7 +203,6 @@ describe('combat and property', () => {
       price: 10,
     });
     a.inventory['sword:3'] = 1;
-    send(world, a, { type: 'equip', item: 'sword:3' });
     send(world, a, { type: 'attack', targetId: station.id });
     expect(a.inventory['wood:1']).toBeUndefined();
     tickWorld(world, 8);
@@ -230,10 +239,9 @@ describe('combat and property', () => {
 });
 
 describe('death and bodies', () => {
-  it('settles attack death after refunding all work and escrow, with equipped items counted once', () => {
+  it('settles attack death after refunding all work and escrow, with carried tools counted once', () => {
     const { world, a, b } = fixture();
     b.inventory = { 'wood:1': 4, 'fibre:1': 4, 'axe:1': 1, 'food:2': 2 };
-    send(world, b, { type: 'equip', item: 'axe:1' });
     send(world, b, { type: 'craft', item: 'sword', tier: 1 });
     send(world, b, { type: 'order', side: 'sell', item: 'food:2', quantity: 2, price: 9 });
     send(world, b, { type: 'order', side: 'buy', item: 'wood:3', quantity: 2, price: 10 });
@@ -246,7 +254,6 @@ describe('death and bodies', () => {
       alive: false,
       gold: 0,
       inventory: {},
-      equipment: {},
       action: null,
       queue: [],
     });
@@ -368,7 +375,6 @@ describe('joint reproduction and command interaction', () => {
       parents: [a.id, b.id],
       gold: 0,
       inventory: {},
-      equipment: {},
       knowledge: {},
       health: 100,
       fullness: 60,

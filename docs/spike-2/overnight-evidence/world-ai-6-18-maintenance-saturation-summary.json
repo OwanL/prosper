@@ -1,0 +1,1938 @@
+{
+  "seed": 18,
+  "population": 6,
+  "ticks": 30000,
+  "maintenance": true,
+  "ms": 32263,
+  "kinds": {
+    "command": 19368,
+    "completion": 8031,
+    "meal": 1149,
+    "trade": 113,
+    "claim": 110,
+    "birth": 23,
+    "alliance": 4,
+    "threat": 76,
+    "extortion": 16,
+    "flee": 10,
+    "attack": 18,
+    "help": 16,
+    "maintenance": 10,
+    "error": 4
+  },
+  "timeline": [
+    {
+      "tick": 500,
+      "alive": 7,
+      "claims": 2,
+      "alliances": []
+    },
+    {
+      "tick": 1000,
+      "alive": 7,
+      "claims": 6,
+      "alliances": [
+        3,
+        2
+      ]
+    },
+    {
+      "tick": 1500,
+      "alive": 7,
+      "claims": 7,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 2000,
+      "alive": 7,
+      "claims": 7,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 2500,
+      "alive": 8,
+      "claims": 8,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 3000,
+      "alive": 8,
+      "claims": 8,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 3500,
+      "alive": 9,
+      "claims": 8,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 4000,
+      "alive": 9,
+      "claims": 9,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 4500,
+      "alive": 9,
+      "claims": 9,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 5000,
+      "alive": 10,
+      "claims": 10,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 5500,
+      "alive": 10,
+      "claims": 10,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 6000,
+      "alive": 11,
+      "claims": 10,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 6500,
+      "alive": 11,
+      "claims": 11,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 7000,
+      "alive": 11,
+      "claims": 11,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 7500,
+      "alive": 12,
+      "claims": 11,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 8000,
+      "alive": 12,
+      "claims": 12,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 8500,
+      "alive": 13,
+      "claims": 12,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 9000,
+      "alive": 13,
+      "claims": 13,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 9500,
+      "alive": 14,
+      "claims": 13,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 10000,
+      "alive": 14,
+      "claims": 14,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 10500,
+      "alive": 14,
+      "claims": 14,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 11000,
+      "alive": 15,
+      "claims": 15,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 11500,
+      "alive": 15,
+      "claims": 15,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 12000,
+      "alive": 16,
+      "claims": 15,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 12500,
+      "alive": 16,
+      "claims": 16,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 13000,
+      "alive": 16,
+      "claims": 16,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 13500,
+      "alive": 17,
+      "claims": 16,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 14000,
+      "alive": 17,
+      "claims": 17,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 14500,
+      "alive": 18,
+      "claims": 17,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 15000,
+      "alive": 18,
+      "claims": 18,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 15500,
+      "alive": 18,
+      "claims": 17,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 16000,
+      "alive": 19,
+      "claims": 18,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 16500,
+      "alive": 19,
+      "claims": 19,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 17000,
+      "alive": 20,
+      "claims": 19,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 17500,
+      "alive": 20,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 18000,
+      "alive": 20,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 18500,
+      "alive": 20,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 19000,
+      "alive": 20,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 19500,
+      "alive": 20,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 20000,
+      "alive": 21,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 20500,
+      "alive": 21,
+      "claims": 20,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 21000,
+      "alive": 21,
+      "claims": 21,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 21500,
+      "alive": 22,
+      "claims": 22,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 22000,
+      "alive": 22,
+      "claims": 21,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 22500,
+      "alive": 23,
+      "claims": 22,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 23000,
+      "alive": 23,
+      "claims": 23,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 23500,
+      "alive": 24,
+      "claims": 22,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 24000,
+      "alive": 24,
+      "claims": 24,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 24500,
+      "alive": 24,
+      "claims": 24,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 25000,
+      "alive": 25,
+      "claims": 24,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 25500,
+      "alive": 25,
+      "claims": 25,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 26000,
+      "alive": 25,
+      "claims": 25,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 26500,
+      "alive": 26,
+      "claims": 26,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 27000,
+      "alive": 26,
+      "claims": 26,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 27500,
+      "alive": 27,
+      "claims": 26,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 28000,
+      "alive": 27,
+      "claims": 27,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 28500,
+      "alive": 27,
+      "claims": 27,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 29000,
+      "alive": 28,
+      "claims": 28,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 29500,
+      "alive": 28,
+      "claims": 28,
+      "alliances": [
+        3,
+        3
+      ]
+    },
+    {
+      "tick": 30000,
+      "alive": 29,
+      "claims": 27,
+      "alliances": [
+        3,
+        3
+      ]
+    }
+  ],
+  "citizens": [
+    {
+      "id": "citizen-127",
+      "name": "Ada",
+      "alive": true,
+      "health": 100,
+      "gold": 92,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "wood:3": 21,
+        "wood:2": 1,
+        "axe:3": 1,
+        "food:2": 1,
+        "food:3": 6
+      },
+      "equipment": {
+        "knife": "knife:1",
+        "axe": "axe:3",
+        "scythe": "scythe:1"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 0,
+          "y": 5
+        },
+        "stance": "cooperative",
+        "aggression": 0.626648667268455,
+        "caution": 0.29018189948983486,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          8,
+          7,
+          12,
+          11
+        ]
+      }
+    },
+    {
+      "id": "citizen-128",
+      "name": "Bram",
+      "alive": true,
+      "health": 100,
+      "gold": 116,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "knife:3": 1,
+        "sword:2": 1,
+        "food:3": 2,
+        "wood:1": 1,
+        "food:2": 4
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:1",
+        "scythe": "scythe:1",
+        "sword": "sword:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 18,
+          "y": 19
+        },
+        "stance": "assertive",
+        "aggression": 0.8,
+        "caution": 0.3,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "open",
+        "accessPrice": 8,
+        "territory": [
+          10,
+          8,
+          14,
+          12
+        ]
+      }
+    },
+    {
+      "id": "citizen-129",
+      "name": "Cora",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "scythe:1": 1,
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:2": 1,
+        "fibre:3": 26,
+        "fibre:2": 3,
+        "scythe:3": 1,
+        "food:2": 1
+      },
+      "equipment": {
+        "scythe": "scythe:3",
+        "axe": "axe:1",
+        "knife": "knife:1"
+      },
+      "intent": "Unsold fibre surplus; watch productive ground",
+      "policy": {
+        "livelihood": "fibre",
+        "targetTier": 3,
+        "home": {
+          "x": 15,
+          "y": 20
+        },
+        "stance": "cooperative",
+        "aggression": 0.35,
+        "caution": 0.7813553962158039,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "avoid",
+        "accessPrice": 0,
+        "territory": [
+          9,
+          11,
+          13,
+          15
+        ]
+      }
+    },
+    {
+      "id": "citizen-130",
+      "name": "Dara",
+      "alive": true,
+      "health": 100,
+      "gold": 116,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "food:3": 2,
+        "scythe:2": 1,
+        "knife:3": 1,
+        "sword:2": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:1",
+        "scythe": "scythe:2",
+        "sword": "sword:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 20,
+          "y": 19
+        },
+        "stance": "assertive",
+        "aggression": 0.8,
+        "caution": 0.3,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "avoid",
+        "accessPrice": 8,
+        "territory": [
+          9,
+          9,
+          13,
+          13
+        ]
+      }
+    },
+    {
+      "id": "citizen-131",
+      "name": "Eli",
+      "alive": true,
+      "health": 100,
+      "gold": 120,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "food:3": 1,
+        "scythe:2": 1,
+        "knife:3": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:1",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 15,
+          "y": 17
+        },
+        "stance": "cooperative",
+        "aggression": 0.28691649571992456,
+        "caution": 0.20412247737403957,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "avoid",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          6,
+          14,
+          10
+        ]
+      }
+    },
+    {
+      "id": "citizen-132",
+      "name": "Faye",
+      "alive": true,
+      "health": 100,
+      "gold": 76,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "food:3": 2,
+        "knife:3": 1,
+        "wood:1": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:1",
+        "scythe": "scythe:1"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 15,
+          "y": 3
+        },
+        "stance": "cooperative",
+        "aggression": 0.25,
+        "caution": 0.8313848446356132,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          6,
+          14,
+          10
+        ]
+      }
+    },
+    {
+      "id": "citizen-1067",
+      "name": "Citizen 1067",
+      "alive": true,
+      "health": 100,
+      "gold": 12,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 19,
+        "food:2": 4,
+        "food:3": 6
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 5,
+          "y": 5
+        },
+        "stance": "cooperative",
+        "aggression": 0.5152150487527252,
+        "caution": 0.5900070668547414,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 8,
+        "territory": [
+          8,
+          5,
+          12,
+          9
+        ]
+      }
+    },
+    {
+      "id": "citizen-5460",
+      "name": "Citizen 5460",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "food:3": 3,
+        "scythe:2": 1,
+        "knife:3": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.39984136004932225,
+        "caution": 0.4872812282177619,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-6628",
+      "name": "Citizen 6628",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 18,
+        "wood:2": 1,
+        "food:2": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.49221083293668927,
+        "caution": 0.5099951340700499,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          3,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "citizen-7775",
+      "name": "Citizen 7775",
+      "alive": true,
+      "health": 100,
+      "gold": 16,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "knife:3": 1,
+        "food:3": 3,
+        "wood:1": 1,
+        "food:2": 4
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.49893637127242985,
+        "caution": 0.6502526487107387,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          6,
+          14,
+          10
+        ]
+      }
+    },
+    {
+      "id": "citizen-9141",
+      "name": "Citizen 9141",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 19,
+        "food:2": 4
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.3408073173835874,
+        "caution": 0.6114235766115598,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          8,
+          5,
+          12,
+          9
+        ]
+      }
+    },
+    {
+      "id": "citizen-10512",
+      "name": "Citizen 10512",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 24,
+        "wood:1": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.41012707613408567,
+        "caution": 0.5906931944540701,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          8,
+          5,
+          12,
+          9
+        ]
+      }
+    },
+    {
+      "id": "citizen-11908",
+      "name": "Citizen 11908",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 18,
+        "wood:1": 1,
+        "food:3": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.3665572109632194,
+        "caution": 0.5020844342070631,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          8,
+          5,
+          12,
+          9
+        ]
+      }
+    },
+    {
+      "id": "citizen-13343",
+      "name": "Citizen 13343",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 17,
+        "wood:2": 1,
+        "wood:1": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.45060921986587343,
+        "caution": 0.49507378888083614,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          3,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "citizen-14899",
+      "name": "Citizen 14899",
+      "alive": true,
+      "health": 100,
+      "gold": 48,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "food:3": 4,
+        "knife:3": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.3888959649950266,
+        "caution": 0.5185339478193781,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-16505",
+      "name": "Citizen 16505",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "food:3": 2,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "knife:3": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.35735404016450045,
+        "caution": 0.5825295584159902,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-17934",
+      "name": "Citizen 17934",
+      "alive": true,
+      "health": 100,
+      "gold": 4,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 20,
+        "food:2": 4
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.4145567831583321,
+        "caution": 0.5195319752092472,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          8,
+          5,
+          12,
+          9
+        ]
+      }
+    },
+    {
+      "id": "citizen-19676",
+      "name": "Citizen 19676",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 17,
+        "wood:2": 1,
+        "wood:1": 1,
+        "food:3": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.44900585832074286,
+        "caution": 0.631264149060007,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          3,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "citizen-21336",
+      "name": "Citizen 21336",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "food:3": 3,
+        "knife:3": 1,
+        "wood:1": 2
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.37142863250337543,
+        "caution": 0.5856845570611766,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          6,
+          14,
+          10
+        ]
+      }
+    },
+    {
+      "id": "citizen-23002",
+      "name": "Citizen 23002",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "knife:3": 1,
+        "food:3": 3,
+        "wood:1": 2
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.4496557722333819,
+        "caution": 0.5893608986749312,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-26322",
+      "name": "Citizen 26322",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "food:3": 9,
+        "knife:3": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.37241673390381036,
+        "caution": 0.6398806399549357,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          6,
+          14,
+          10
+        ]
+      }
+    },
+    {
+      "id": "citizen-27495",
+      "name": "Citizen 27495",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "knife:3": 1,
+        "food:3": 3
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.527740600798279,
+        "caution": 0.46278638559160745,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-29241",
+      "name": "Citizen 29241",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 18,
+        "wood:1": 1,
+        "food:3": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.47189486352726817,
+        "caution": 0.5667359171784482,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          3,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "citizen-30724",
+      "name": "Citizen 30724",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 18,
+        "wood:1": 1,
+        "food:3": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.418399464385584,
+        "caution": 0.5262426051194778,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          10,
+          3,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "citizen-32756",
+      "name": "Citizen 32756",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "axe:1": 1,
+        "knife:1": 1,
+        "scythe:1": 1,
+        "axe:2": 1,
+        "knife:2": 1,
+        "scythe:2": 1,
+        "axe:3": 1,
+        "wood:3": 18,
+        "wood:1": 1
+      },
+      "equipment": {
+        "axe": "axe:3",
+        "knife": "knife:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold wood surplus; watch productive ground",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.3609500940423459,
+        "caution": 0.49409403571626165,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 8,
+        "territory": [
+          8,
+          5,
+          12,
+          9
+        ]
+      }
+    },
+    {
+      "id": "citizen-34500",
+      "name": "Citizen 34500",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "food:3": 8,
+        "scythe:2": 1,
+        "knife:3": 1,
+        "wood:1": 2
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.38389502130448816,
+        "caution": 0.6570514279301277,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-36079",
+      "name": "Citizen 36079",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "scythe:2": 1,
+        "food:3": 3,
+        "knife:3": 1,
+        "wood:1": 2
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Unsold food surplus; watch productive ground",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.49085819176398215,
+        "caution": 0.6330202750279568,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 8,
+        "territory": [
+          10,
+          6,
+          14,
+          10
+        ]
+      }
+    },
+    {
+      "id": "citizen-37931",
+      "name": "Citizen 37931",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "knife:1": 1,
+        "axe:1": 1,
+        "scythe:1": 1,
+        "knife:2": 1,
+        "axe:2": 1,
+        "food:3": 3,
+        "scythe:2": 1,
+        "knife:3": 1
+      },
+      "equipment": {
+        "knife": "knife:3",
+        "axe": "axe:2",
+        "scythe": "scythe:2"
+      },
+      "intent": "Produce food T3",
+      "policy": {
+        "livelihood": "food",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.4301125532016158,
+        "caution": 0.5575514924130401,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0,
+        "territory": [
+          11,
+          4,
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "id": "citizen-39432",
+      "name": "Citizen 39432",
+      "alive": true,
+      "health": 100,
+      "gold": 0,
+      "inventory": {
+        "food:1": 3
+      },
+      "equipment": {},
+      "intent": "Develop axe T1",
+      "policy": {
+        "livelihood": "wood",
+        "targetTier": 3,
+        "home": {
+          "x": 12,
+          "y": 8
+        },
+        "stance": "cooperative",
+        "aggression": 0.49437203649431466,
+        "caution": 0.5238662245101294,
+        "foodReserveTicks": 700,
+        "sellPrice": 4,
+        "buyPrice": 6,
+        "allies": [],
+        "rivals": [],
+        "reproduction": "seek",
+        "accessPrice": 0
+      }
+    }
+  ],
+  "gold": 600
+}

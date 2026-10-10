@@ -5,9 +5,9 @@ export default defineConfig({
   publicDir: false,
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: Number(process.env.PROSPER_UI_PORT ?? 5173),
     strictPort: true,
-    proxy: { '/api': 'http://127.0.0.1:4310' },
+    proxy: { '/api': `http://127.0.0.1:${process.env.PROSPER_API_PORT ?? 4310}` },
   },
   build: { sourcemap: true },
 });

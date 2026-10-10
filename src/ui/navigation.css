@@ -1,0 +1,3 @@
+.world-scene { touch-action: none; }
+.world-scene:focus-visible { outline: 2px solid #f9e7a2; outline-offset: -3px; }
+.map-navigation-help { font-size: .75rem; line-height: 1.5; }

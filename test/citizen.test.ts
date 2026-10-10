@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Citizen, CitizenObservation, Command, World } from '../src/shared/types.ts';
@@ -38,7 +38,6 @@ function setup(options: CitizenRunnerOptions = {}) {
     fullness: 100,
     gold: 100,
     inventory: {},
-    equipment: {},
     action: null,
     queue: [],
     goals: ['unfinished project'],
@@ -102,11 +101,11 @@ function setup(options: CitizenRunnerOptions = {}) {
   const runner = new CitizenRunner(
     {
       world: () => world,
-      observe: () => ({ ...observation, tick: world.tick }),
+      observe: (id) => ({ ...observation, citizen: world.citizens[id], tick: world.tick }),
       command,
       diagnostic,
     },
-    options,
+    { contextMode: 'legacy', ...options },
   );
   return { citizen, world, observation, commands, diagnostic, command, runner };
 }
@@ -134,6 +133,262 @@ function live(transport: CitizenRunnerOptions['transport']) {
 }
 
 describe('fresh citizen runner', () => {
+  it('reports truncated and empty results instead of claiming completed reasoning', async () => {
+    const { runner } = setup({
+      contextMode: 'legacy', mode: 'recorded',
+      recorded: [
+        {
+          citizenId: 'a',
+          responses: [{ finishReason: 'length', usage: { inputTokens: 10, outputTokens: 1024 } }],
+        },
+        { citizenId: 'a', responses: [{ finishReason: 'stop', content: '   ' }] },
+      ],
+    });
+    await runner.startTurn('a');
+    expect(runner.records()[0]).toMatchObject({ status: 'yielded', stopReason: 'output_limit' });
+    expect(runner.records()[0].requests[0].finishReason).toBe('length');
+    expect(runner.records()[0].requests).toHaveLength(1);
+    await runner.startTurn('a');
+    expect(runner.records()[1]).toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('no visible response or tool calls'),
+    });
+  });
+  it('retains valid effects but marks a truncated tool response as yielded', async () => {
+    const { runner, commands } = setup({
+      contextMode: 'legacy', mode: 'recorded',
+      recorded: [
+        {
+          citizenId: 'a',
+          responses: [
+            { ...call('one', { type: 'remember', text: 'retained' }), finishReason: 'length' },
+          ],
+        },
+      ],
+    });
+    await runner.startTurn('a');
+    expect(commands).toHaveLength(1);
+    expect(runner.records()[0]).toMatchObject({ status: 'yielded', stopReason: 'output_limit' });
+  });
+  it('allows 40k output and waits a review interval after a slow live turn finishes', async () => {
+    const pending = deferred<ProviderResponse>();
+    const transport = vi.fn(() => pending.promise);
+    const { runner, world, citizen } = setup(live(transport));
+    const done = runner.startTurn('a');
+    await flush();
+    expect(runner.records()[0].requests[0].payload.max_tokens).toBe(40000);
+    world.tick = 100;
+    pending.resolve({ content: 'done', usage: { inputTokens: 10, outputTokens: 2000 } });
+    await done;
+    expect(citizen.nextReviewTick).toBe(112);
+    runner.tick();
+    await flush();
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it('surfaces a restored token stop below the request cap, skips futile reviews, and resumes after cap increase', async () => {
+    const root = directory();
+    const oldLedger = new RequestLedger({ directory: root, maxRequests: 100, maxTokens: 100_000 });
+    const request = oldLedger.reserve({
+      runId: 'old',
+      turnId: 'old',
+      citizenId: 'a',
+      inputTokens: 99_000,
+      maxOutputTokens: 0,
+    });
+    oldLedger.settle(request.requestId);
+    const ledger = new RequestLedger({ directory: root });
+    const transport = vi.fn(async () => ({
+      content: 'fresh',
+      usage: { inputTokens: 5, outputTokens: 2 },
+    }));
+    const { runner, world, citizen } = setup({ contextMode: 'legacy', mode: 'live', ledger, transport });
+    expect(runner.budget()).toMatchObject({
+      requests: 1,
+      tokens: 99_000,
+      blocked: { reason: 'tokens', remainingTokens: 1000 },
+    });
+    const text = readFileSync(join(root, 'request-ledger.jsonl'), 'utf8');
+    for (let i = 0; i < 100; i++) {
+      tickWorld(world);
+      runner.tick();
+      await runner.startTurn('a');
+    }
+    expect(world.tick).toBe(100);
+    expect(citizen.fullness).toBeLessThan(100);
+    expect(transport).not.toHaveBeenCalled();
+    expect(runner.records()).toEqual([]);
+    expect(readFileSync(join(root, 'request-ledger.jsonl'), 'utf8')).toBe(text);
+    ledger.setLimits({ maxRequests: 100, maxTokens: 200_000 });
+    await runner.startTurn('a');
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(runner.records()[0].status).toBe('completed');
+    expect(runner.budget()).toMatchObject({ requests: 2, tokens: 99_007, maxTokens: 200_000 });
+  });
+  it('yields mid-turn on total token budget, preserves committed work, and never retries blocked turns', async () => {
+    const root = directory();
+    const ledger = new RequestLedger({ directory: root, maxTokens: 1_000_000 });
+    const transport = vi.fn(async () => ({
+      toolCalls: [
+        ...call('goal', { type: 'goals', goals: ['continue project'] }).toolCalls!,
+        { id: 'detail', name: 'query_tile', arguments: '{"x":1,"y":1}' },
+      ],
+      usage: { inputTokens: 999_999, outputTokens: 0 },
+    }));
+    const { runner, citizen, world, commands } = setup({ contextMode: 'legacy', mode: 'live', ledger, transport });
+    citizen.queue.push({ type: 'move', x: 2, y: 2 });
+    await runner.startTurn('a');
+    expect(runner.records()[0]).toMatchObject({ status: 'yielded', stopReason: 'budget_tokens' });
+    expect(runner.records()[0].error).toBeUndefined();
+    expect(citizen.goals).toEqual(['continue project']);
+    expect(citizen.queue).toHaveLength(1);
+    expect(commands).toHaveLength(1);
+    expect(runner.budget()).toMatchObject({
+      requests: 1,
+      pending: 0,
+      tokens: 999_999,
+      blocked: { reason: 'tokens', remainingTokens: 1 },
+    });
+    const ledgerText = readFileSync(join(root, 'request-ledger.jsonl'), 'utf8');
+    const settingsText = readFileSync(join(root, 'budget-settings.jsonl'), 'utf8');
+    for (let i = 0; i < 100; i++) {
+      world.tick++;
+      runner.tick();
+      await runner.startTurn('a');
+    }
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(runner.records()).toHaveLength(1);
+    expect(readFileSync(join(root, 'request-ledger.jsonl'), 'utf8')).toBe(ledgerText);
+    expect(readFileSync(join(root, 'budget-settings.jsonl'), 'utf8')).toBe(settingsText);
+  });
+  it('resumes after an interrupted request receipt creates capacity without authorizing late tools', async () => {
+    const pending = deferred<ProviderResponse>();
+    const ledger = new RequestLedger({ directory: directory(), maxTokens: 200_000 });
+    const { requestId } = ledger.reserve({
+      runId: 'old',
+      turnId: 'old',
+      citizenId: 'old',
+      inputTokens: 80_000,
+      maxOutputTokens: 0,
+    });
+    ledger.settle(requestId);
+    let sends = 0;
+    const transport = vi.fn(() =>
+      ++sends === 1
+        ? pending.promise
+        : Promise.resolve({ content: 'fresh', usage: { inputTokens: 1, outputTokens: 1 } }),
+    );
+    const { runner, commands } = setup({ contextMode: 'legacy', mode: 'live', ledger, transport });
+    const done = runner.startTurn('a');
+    await flush();
+    // Derive capacity from the actual advertised schema instead of its previous byte size.
+    const reserved = ledger.status().tokens - 80_000;
+    expect(reserved).toBeGreaterThan(4);
+    ledger.setLimits({ maxRequests: 100, maxTokens: 80_000 + reserved + Math.floor(reserved / 2) });
+    runner.interrupt();
+    await done;
+    expect(runner.budget().blocked?.reason).toBe('tokens');
+    await runner.startTurn('a');
+    expect(transport).toHaveBeenCalledTimes(1);
+    pending.resolve({
+      ...call('late', { type: 'cancel' }),
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+    await flush();
+    expect(commands).toEqual([]);
+    expect(runner.budget().blocked).toBeUndefined();
+    await runner.startTurn('a');
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+  it('does not churn global blockage metadata for an unaffordable citizen while another fresh context fits', async () => {
+    const root = directory();
+    // Fits the ordinary context plus 40k output, but not the oversized citizen below.
+    const ledger = new RequestLedger({ directory: root, maxTokens: 75_000 });
+    const transport = vi.fn(async () => ({
+      content: 'done',
+      usage: { inputTokens: 5, outputTokens: 2 },
+    }));
+    const { runner, world, citizen } = setup({ contextMode: 'legacy', mode: 'live', ledger, transport });
+    world.citizens.b = { ...structuredClone(citizen), id: 'b', nextReviewTick: 1000 };
+    citizen.personality = 'long personality '.repeat(2000);
+    expect(runner.budget().blocked).toBeUndefined();
+    const settingsText = readFileSync(join(root, 'budget-settings.jsonl'), 'utf8');
+    for (let i = 0; i < 100; i++) {
+      world.tick++;
+      runner.tick();
+      await flush();
+    }
+    expect(transport).not.toHaveBeenCalled();
+    expect(runner.records()).toEqual([]);
+    expect(readFileSync(join(root, 'budget-settings.jsonl'), 'utf8')).toBe(settingsText);
+    expect(readFileSync(join(root, 'request-ledger.jsonl'), 'utf8')).toBe('');
+    world.tick = 1000;
+    runner.tick();
+    await flush();
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(runner.records()[0].citizenId).toBe('b');
+  });
+  it('does not mistake a too-large continuation for an unaffordable fresh review', async () => {
+    const cap = 100_000;
+    const ledger = new RequestLedger({ directory: directory(), maxTokens: cap });
+    let sends = 0;
+    const transport = vi.fn(async (request: TransportRequest): Promise<ProviderResponse> => {
+      sends++;
+      if (sends === 1) {
+        const initialSize =
+          Buffer.byteLength(JSON.stringify(request.payload)) + request.payload.max_tokens;
+        return {
+          content: 'continuation detail '.repeat(200),
+          toolCalls: [{ id: 'query', name: 'query_tile', arguments: '{"x":2,"y":1}' }],
+          usage: { inputTokens: cap - initialSize - 100, outputTokens: 0 },
+        };
+      }
+      return { content: 'fresh completion', usage: { inputTokens: 10, outputTokens: 2 } };
+    });
+    const { runner } = setup({ contextMode: 'legacy', mode: 'live', ledger, transport });
+    await runner.startTurn('a');
+    expect(runner.records()[0]).toMatchObject({ status: 'yielded', stopReason: 'budget_tokens' });
+    expect(ledger.status().blocked?.reason).toBe('tokens');
+    expect(runner.budget().blocked).toBeUndefined();
+    await runner.startTurn('a');
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(runner.records()[1].status).toBe('completed');
+  });
+  it('yields at the tool boundary instead of claiming all returned calls completed', async () => {
+    const { runner, commands } = setup({
+      contextMode: 'legacy', mode: 'recorded',
+      maxToolsPerTurn: 1,
+      recorded: [
+        {
+          citizenId: 'a',
+          responses: [
+            {
+              toolCalls: [
+                {
+                  id: 'first',
+                  name: 'command',
+                  arguments: JSON.stringify({ type: 'goals', goals: ['continue'] }),
+                },
+                { id: 'second', name: 'command', arguments: JSON.stringify({ type: 'cancel' }) },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    await runner.startTurn('a');
+    expect(commands).toEqual([{ type: 'goals', goals: ['continue'] }]);
+    expect(runner.records()[0]).toMatchObject({ status: 'yielded', stopReason: 'tool_limit' });
+    expect(runner.records()[0].error).toBeUndefined();
+    expect(runner.records()[0].toolEvents).toHaveLength(1);
+  });
+  it('completes at the exact tool cap without spending on an unnecessary acknowledgement', async () => {
+    const transport = vi.fn(async () => call('goal', { type: 'goals', goals: ['continue'] }));
+    const { runner, commands } = setup({ ...live(transport), maxToolsPerTurn: 1 });
+    await runner.startTurn('a');
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(commands).toHaveLength(1);
+    expect(runner.records()[0]).toMatchObject({ status: 'completed' });
+  });
   it('defaults to explicitly non-evaluative scripted travel/harvest', async () => {
     const { runner, commands } = setup();
     await runner.startTurn('a');
@@ -152,7 +407,7 @@ describe('fresh citizen runner', () => {
       consent: { ally: 40 },
       reproductionCooldown: 80,
     });
-    expect(context[0].content).toContain('last-known coordinates first');
+    expect(context[0].content).toContain('information is dated, not remote truth');
   });
   it('headless scripted turns travel to remembered deposits and then make physical progress through the knowledge gate', async () => {
     const { world, citizen } = setup();
@@ -215,14 +470,14 @@ describe('fresh citizen runner', () => {
     expect(Object.keys(citizen.knowledge).length).toBeGreaterThan(initial + 60);
     expect(citizen.alive).toBe(true);
   });
-  it('scripted crafting/equipping progresses without restarting existing work', async () => {
+  it('scripted crafting with automatic tool use progresses without restarting existing work', async () => {
     const { runner, citizen, commands } = setup();
     citizen.inventory = { 'wood:1': 3, 'fibre:1': 3 };
     await runner.startTurn('a');
     expect(commands[0]).toEqual({ type: 'craft', item: 'knife', tier: 1 });
-    citizen.inventory['knife:1'] = 1;
+    citizen.inventory = { 'knife:1': 1, 'food:1': 3, 'fibre:1': 3 };
     await runner.startTurn('a');
-    expect(commands[1]).toEqual({ type: 'equip', item: 'knife:1' });
+    expect(commands[1]).toEqual({ type: 'craft', item: 'axe', tier: 1 });
     citizen.queue.push({ type: 'harvest', depositId: 'wood' });
     await runner.startTurn('a');
     expect(commands).toHaveLength(2);
@@ -310,7 +565,12 @@ describe('fresh citizen runner', () => {
       live(async (request) => {
         requests.push(request);
         if (requests.length === 1)
-          return call('goal', { type: 'goals', goals: ['travel to ally'] });
+          return {
+            toolCalls: [
+              ...call('goal', { type: 'goals', goals: ['travel to ally'] }).toolCalls!,
+              { id: 'detail', name: 'query_tile', arguments: '{"x":1,"y":1}' },
+            ],
+          };
         if (requests.length === 2) return pending.promise;
         return { content: 'fresh turn' };
       }),
@@ -349,7 +609,12 @@ describe('fresh citizen runner', () => {
           { id: 'coord', name: 'command', arguments: '{"type":"move","x":-1,"y":0}' },
         ],
       },
-      call('once', { type: 'remember', text: 'friend' }),
+      {
+        toolCalls: [
+          ...call('once', { type: 'remember', text: 'friend' }).toolCalls!,
+          { id: 'detail', name: 'query_tile', arguments: '{"x":1,"y":1}' },
+        ],
+      },
       call('once', { type: 'remember', text: 'friend' }),
       { content: 'done' },
     ];
@@ -372,7 +637,7 @@ describe('fresh citizen runner', () => {
   });
   it('query_tile never supplies omniscient hidden state', async () => {
     const { runner, world } = setup({
-      mode: 'recorded',
+      contextMode: 'legacy', mode: 'recorded',
       recorded: [
         {
           citizenId: 'a',
@@ -400,7 +665,7 @@ describe('fresh citizen runner', () => {
   it('recorded mode requires imported fixtures and never falls back', async () => {
     expect(() => setup({ mode: 'recorded' })).toThrow('explicitly imported');
     const transport = vi.fn();
-    const { runner } = setup({ mode: 'recorded', recorded: [], transport });
+    const { runner } = setup({ contextMode: 'legacy', mode: 'recorded', recorded: [], transport });
     await runner.startTurn('a');
     expect(runner.records()[0].error).toContain('no live fallback');
     expect(transport).not.toHaveBeenCalled();
@@ -426,7 +691,7 @@ describe('fresh citizen runner', () => {
       expect(ledger.status().pending).toBe(1);
       return {};
     });
-    const { runner } = setup({ mode: 'live', ledger, transport });
+    const { runner } = setup({ contextMode: 'legacy', mode: 'live', ledger, transport });
     await runner.startTurn('a');
     expect(transport).toHaveBeenCalledTimes(1);
     writeFileSync(join(path, 'request-ledger.jsonl'), 'corrupt\n');
@@ -437,12 +702,23 @@ describe('fresh citizen runner', () => {
   it('bounds requests/tools/records and returns immutable inspector snapshots', async () => {
     const recorded = Array.from({ length: 5 }, () => ({
       citizenId: 'a',
-      responses: [call('one', { type: 'message', text: 'hello' })],
+      responses: [
+        {
+          toolCalls: [
+            ...call('one', { type: 'message', text: 'hello' }).toolCalls!,
+            { id: 'detail', name: 'query_tile', arguments: '{"x":1,"y":1}' },
+          ],
+        },
+      ],
     }));
-    const { runner } = setup({ mode: 'recorded', recorded, maxRequestsPerTurn: 1, maxRecords: 2 });
+    const { runner } = setup({ contextMode: 'legacy', mode: 'recorded', recorded, maxRequestsPerTurn: 1, maxRecords: 2 });
     for (let i = 0; i < 5; i++) await runner.startTurn('a');
     expect(runner.records().length).toBe(2);
-    expect(runner.records().at(-1)?.error).toContain('request limit');
+    expect(runner.records().at(-1)).toMatchObject({
+      status: 'yielded',
+      stopReason: 'request_limit',
+    });
+    expect(runner.records().at(-1)?.error).toBeUndefined();
     const copy = runner.records();
     copy[0].calls.length = 0;
     expect(runner.records()[0].calls).toHaveLength(1);
@@ -462,7 +738,7 @@ describe('fresh citizen runner', () => {
     expect(citizen.queue).toHaveLength(1);
     expect(runner.records().at(-1)?.mode).toBe('scripted');
   });
-  it('uses requested local Ollama model/high reasoning, excludes hidden reasoning', async () => {
+  it('uses requested local Ollama model/low reasoning, excludes hidden reasoning', async () => {
     const fetch = vi.fn(
       async (_url: string, _init: RequestInit) =>
         new Response(
@@ -485,7 +761,7 @@ describe('fresh citizen runner', () => {
     );
     expect(payload).toMatchObject({
       model: 'deepseek-v4.1-flash:cloud',
-      reasoning_effort: 'high',
+      reasoning_effort: 'low',
       stream: false,
     });
     expect(JSON.stringify(runner.records())).not.toContain('hidden secret');
