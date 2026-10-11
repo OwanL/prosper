@@ -89,19 +89,23 @@ describe('foundational world', () => {
     ['competition', 9, 7, 1, 1],
     ['progression', 3, 1, 1, 1],
   ] as const)(
-    'starts %s with %i citizens on distinct T1 outskirts deposits',
+    'starts %s with %i citizens at distinct outskirts positions with unchanged wood/fibre starts',
     (scenario, population, food, wood, fibre) => {
       for (const seed of [1, 42, 927]) {
         const world = createWorld({ seed, scenario });
-        const starts = Object.values(world.citizens).map((c) =>
-          Object.values(world.deposits).find((d) => d.x === c.x && d.y === c.y)!,
-        );
+        const starts = Object.values(world.citizens);
+        const startsOn = (resource: Resource) => starts.filter((c) =>
+          Object.values(world.deposits).some((d) =>
+            d.resource === resource && d.tier === 1 && d.x === c.x && d.y === c.y));
         expect(starts).toHaveLength(population);
-        expect(starts.filter((d) => d.resource === 'food')).toHaveLength(food);
-        expect(starts.filter((d) => d.resource === 'wood')).toHaveLength(wood);
-        expect(starts.filter((d) => d.resource === 'fibre')).toHaveLength(fibre);
-        expect(new Set(starts.map((d) => d.id)).size).toBe(starts.length);
-        expect(starts.every((d) => d.tier === 1 && ringAt(world, d) === RING_COUNT - 1)).toBe(true);
+        expect(startsOn('wood')).toHaveLength(wood);
+        expect(startsOn('fibre')).toHaveLength(fibre);
+        // Former food starts stay put even when their deposits relocate.
+        expect(population - startsOn('wood').length - startsOn('fibre').length).toBe(food);
+        expect(new Set(starts.map((c) => `${c.x},${c.y}`)).size).toBe(starts.length);
+        expect(starts.every((c) => ringAt(world, c) === RING_COUNT - 1)).toBe(true);
+        for (const citizen of starts)
+          expect(citizen.inventory).toEqual({ 'food:1': BALANCE.startingFood });
       }
     },
   );
@@ -127,9 +131,6 @@ describe('foundational world', () => {
       expect(citizen.gold).toBe(100);
       expect(citizen.fullness).toBe(100);
       expect(citizen.inventory).toEqual({ 'food:1': 3 });
-      expect(
-        Object.values(world.deposits).some((d) => d.tier === 1 && distance(d, citizen) === 0),
-      ).toBe(true);
     }
     expect(world.initialGold).toBe(
       Object.values(world.citizens).reduce((sum, c) => sum + c.gold, 0),
@@ -222,14 +223,12 @@ describe('foundational world', () => {
     expect(citizen.x).toBe(1);
   });
 
-  it('reserves harvest stock across travel and work; cancellation releases it without a yield', () => {
+  it('allows competing harvest travel and work; cancellation produces no yield', () => {
     const { world, citizen, other } = fixture();
     const node = deposit(world);
     const before = { ...citizen.inventory };
     send(world, citizen, { type: 'harvest', depositId: node.id });
-    expect(dispatch(world, other.id, { type: 'harvest', depositId: node.id }).code).toBe(
-      'depleted-deposit',
-    );
+    expect(dispatch(world, other.id, { type: 'harvest', depositId: node.id }).ok).toBe(true);
     expect(node.stock).toBe(1);
     send(world, citizen, { type: 'cancel' });
     expect(citizen.inventory).toEqual(before);
@@ -449,7 +448,7 @@ describe('foundational world', () => {
     ).toBe('invalid-refining-tier');
   });
 
-  it('refunds active refining after destruction or lost ownership and rejects listed stations', () => {
+  it('refunds active refining after destruction or lost ownership and rejects market building orders', () => {
     for (const mutation of ['destroy', 'ownership'] as const) {
       const { world, citizen, other } = fixture();
       const building = station(world, citizen, 2);
@@ -462,20 +461,23 @@ describe('foundational world', () => {
       expect(citizen.action).toBeNull();
       expect(citizen.inventory).toEqual({ 'wood:2': 3 });
     }
+    // Migrated meaning: market building trading is removed, so a station can never become
+    // listed; listing attempts are rejected ('building-trading-disabled') both while the
+    // station is idle and while it is actively refining, and no order is ever created.
+    // Ownership loss during refining is covered above via the explicit fixture mutation.
     const { world, citizen } = fixture();
     const building = station(world, citizen);
     citizen.inventory = { 'wood:1': 3 };
-    send(world, citizen, {
-      type: 'order',
-      side: 'sell',
-      item: `building:${building.id}`,
-      quantity: 1,
-      price: 10,
-    });
     expect(
-      dispatch(world, citizen.id, { type: 'refine', buildingId: building.id, fromTier: 1 }).code,
-    ).toBe('listed-station');
-    send(world, citizen, { type: 'cancel-order', orderId: Object.keys(world.orders)[0] });
+      dispatch(world, citizen.id, {
+        type: 'order',
+        side: 'sell',
+        item: `building:${building.id}`,
+        quantity: 1,
+        price: 10,
+      }).code,
+    ).toBe('building-trading-disabled');
+    expect(world.orders).toEqual({});
     send(world, citizen, { type: 'refine', buildingId: building.id, fromTier: 1 });
     expect(
       dispatch(world, citizen.id, {
@@ -485,7 +487,8 @@ describe('foundational world', () => {
         quantity: 1,
         price: 10,
       }).code,
-    ).toBe('building-busy');
+    ).toBe('building-trading-disabled');
+    expect(world.orders).toEqual({});
   });
 
   it('builds walls from adjacent tiles and prevents covering deposits/citizens', () => {
@@ -692,7 +695,7 @@ describe('foundational world', () => {
     tickWorld(world);
     expect(citizen.inventory['food:1']).toBeUndefined();
     expect(citizen.inventory['food:2']).toBe(1);
-    expect(citizen.fullness).toBeCloseTo(59.9 + 100 / 9);
+    expect(citizen.fullness).toBeCloseTo(59.95 + 100 / 9);
     expect(citizen.health).toBeCloseTo(50.05);
     citizen.fullness = 0;
     citizen.inventory = { 'food:3': 1 };
@@ -707,12 +710,12 @@ describe('foundational world', () => {
     expect(citizen.inventory['food:1']).toBe(1);
   });
 
-  it('allows 1,000 ticks of fullness and 500 ticks of starvation with no food', () => {
+  it('allows 2,000 ticks of fullness and 500 ticks of starvation with no food', () => {
     const { world, citizen } = fixture();
     citizen.inventory = {};
-    tickWorld(world, 999);
+    tickWorld(world, 1_999);
     expect(citizen.health).toBe(100);
-    expect(citizen.fullness).toBeCloseTo(0.1);
+    expect(citizen.fullness).toBeCloseTo(0.05);
     tickWorld(world);
     expect(citizen.fullness).toBe(0);
     expect(citizen.health).toBeCloseTo(99.8);
@@ -788,7 +791,7 @@ describe('foundational world', () => {
     );
     expect(
       dispatch(world, citizen.id, { type: 'consent', partnerId: 'none', accept: true }).code,
-    ).toBe('missing-partner');
+    ).toBe('unsupported-command');
     expect(citizen.action).toBeNull();
     expect(dispatch(world, citizen.id, { type: 'move', x: -0.5, y: 0 }).code).toBe(
       'invalid-destination',

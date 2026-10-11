@@ -199,9 +199,12 @@ describe('citizen knowledge projection', () => {
     expect(Object.keys(sighting).sort()).toEqual([
       'activity',
       'alive',
+      'busy',
       'color',
+      'gold',
       'health',
       'id',
+      'inventory',
       'name',
       'x',
       'y',

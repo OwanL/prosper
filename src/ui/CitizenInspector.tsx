@@ -1,8 +1,9 @@
-import type { Citizen } from '../shared/types';
+import type { Citizen, SpectatorCitizen } from '../shared/types';
 import type { Directive } from '../shared/directive-types';
 import { sequencingWarnings } from '../shared/directive-guidance';
 import { CitizenMotivation } from './Spectator';
 import { Tooltip } from './Tooltip';
+import { unaffiliatedColor, withoutControllerSummary, type SceneCitizen } from './model';
 
 function Meter({ label, value }: { label: string; value: number }) {
   return (
@@ -36,8 +37,12 @@ export function Inspector({
   unavailable,
   cancel,
   result,
+  decisionTreeDebug = false,
+  territory,
 }: {
-  citizen?: Citizen;
+  territory?: SceneCitizen['territory'];
+  citizen?: Citizen | SpectatorCitizen;
+  decisionTreeDebug?: boolean;
   unavailable: boolean;
   cancel: () => void;
   result: string;
@@ -62,7 +67,7 @@ export function Inspector({
   return (
     <div data-testid="citizen-inspector" data-citizen-id={citizen.id}>
       <div className="identity">
-        <span className="portrait" style={{ background: citizen.color }}>
+        <span className="portrait" style={{ background: territory?.color ?? unaffiliatedColor }}>
           ♟
         </span>
         <div>
@@ -75,6 +80,10 @@ export function Inspector({
           <p>
             ({citizen.x}, {citizen.y}) · {citizen.alive ? 'Living' : 'Dead'}
           </p>
+          <p className="roster-membership" data-testid="inspector-membership">
+            <span className="roster-swatch" style={{ background: territory?.color ?? unaffiliatedColor }} />
+            {territory ? `${territory.label} · ${territory.role}` : 'Unaffiliated · neutral grey'}
+          </p>
         </div>
       </div>
       <details>
@@ -83,7 +92,35 @@ export function Inspector({
       </details>
       <Meter label="Health" value={citizen.health} />
       <Meter label="Fullness" value={citizen.fullness} />
-      <CitizenMotivation citizen={citizen} />
+      {citizen.rest && (
+        <>
+          <Meter label="Rest" value={citizen.rest.value} />
+          {citizen.rest.sleepingHouseId && (
+            <p className="muted" data-testid="rest-sleeping">
+              Sleeping · resting in house {citizen.rest.sleepingHouseId}
+            </p>
+          )}
+        </>
+      )}
+      <CitizenMotivation citizen={withoutControllerSummary(citizen)} />
+      {citizen.mind && <MindDossier citizen={citizen} />}
+      {decisionTreeDebug && 'treeDebug' in citizen && citizen.treeDebug && (
+        <details data-testid="tree-diagnostics">
+          <summary>Retained controller history</summary>
+          <p className="muted">Bounded history retained by this citizen’s controller, not a log starting when diagnostics were enabled.</p>
+          <details><summary>Tasks · {citizen.treeDebug.tasks.length}</summary>
+            {citizen.treeDebug.tasks.map(task => <details key={task.id}><summary>{task.definitionId} · {task.status} · {task.phase}</summary><pre>{JSON.stringify(task, null, 2)}</pre></details>)}
+          </details>
+          <details><summary>Trace · {citizen.treeDebug.trace.length}</summary>
+            <p>{citizen.treeDebug.traceOmitted} older trace entries evicted</p>
+            <ol>{citizen.treeDebug.trace.map((entry, i) => <li key={i}>Tick {entry.tick} · {entry.definitionId} · {entry.transition}: {entry.reason}{entry.command && <details><summary>Proposed command</summary><pre>{JSON.stringify(entry.command, null, 2)}</pre></details>}</li>)}</ol>
+          </details>
+          <details><summary>Delivery receipts · {citizen.treeDebug.receipts.length}</summary>
+            <ul>{citizen.treeDebug.receipts.map(receipt => <li key={receipt.id}>Tick {receipt.tick} · {receipt.quantity} {receipt.item} · {receipt.source} · {receipt.requestId ?? 'unallocated'}<details><summary>Receipt identity</summary><p>{receipt.id} · settlement {receipt.settlementId}</p></details></li>)}</ul>
+          </details>
+          <details><summary>All retained memories · {citizen.treeDebug.memories.length}</summary><ul>{citizen.treeDebug.memories.map(memory => <li key={memory.id}>Tick {memory.tick} · {memory.kind}: {memory.text}</li>)}</ul></details>
+        </details>
+      )}
       {citizen.autonomy && (
         <details className="social-dossier">
           <summary>Local policy & relationships</summary>
@@ -375,5 +412,87 @@ export function Inspector({
         </ul>
       </details>
     </div>
+  );
+}
+
+/** The ten provisional dispositions, fixed order so comparisons stay stable. */
+const DISPOSITIONS = [
+  'ambition',
+  'morals',
+  'generosity',
+  'riskTolerance',
+  'patience',
+  'sociability',
+  'vengefulness',
+  'familyOrientation',
+  'enterprise',
+  'economicIndependence',
+] as const;
+const dispositionLabel = (key: string): string =>
+  key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+
+function MindDossier({ citizen }: { citizen: Citizen | SpectatorCitizen }) {
+  const mind = citizen.mind!;
+  const active = 'tasks' in mind
+    ? mind.tasks.find((task) => task.id === mind.activeTaskId) ?? mind.tasks.find((task) => task.status === 'running')
+    : mind.currentTask;
+  return (
+    <details className="mind-dossier" data-testid="mind-dossier">
+      <summary>Mind · dispositions, current task & memories</summary>
+      <div className="dispositions" data-testid="mind-dispositions">
+        {DISPOSITIONS.map((key) => {
+          const value = mind.dispositions[key];
+          return (
+            <label key={key} className="meter-label">
+              {dispositionLabel(key)}
+              <span>{Number.isFinite(value) ? Math.round(value * 100) : '—'} / 100</span>
+              <meter
+                min="0"
+                max="100"
+                value={(value || 0) * 100}
+                aria-label={dispositionLabel(key)}
+              />
+            </label>
+          );
+        })}
+      </div>
+      <h4>Current task</h4>
+      {active ? (
+        <p data-testid="mind-current-task">
+          {active.request.purpose || active.definitionId} · {active.status} · {active.phase} ·
+          delivered {active.delivered} / {active.request.quantity} {active.request.resource} T
+          {active.request.tier}
+        </p>
+      ) : (
+        <p className="muted" data-testid="mind-current-task">
+          No active task
+        </p>
+      )}
+      <h4>Meaningful memories</h4>
+      <ul className="feed mind-memories" data-testid="mind-memories">
+        {mind.memories.length ? (
+          mind.memories
+            .slice(-12)
+            .reverse()
+            .map((memory) => (
+              <li key={memory.id} data-kind={memory.kind}>
+                <small>
+                  Tick {memory.tick} · {memory.kind}
+                  {memory.otherId ? ` · with ${memory.otherId}` : ''}
+                </small>
+                {memory.text}
+              </li>
+            ))
+        ) : (
+          <li className="muted">No mind memories recorded</li>
+        )}
+      </ul>
+      {mind.memoriesOmitted > 0 && (
+        <p className="muted">{mind.memoriesOmitted} older memories evicted from controller history</p>
+      )}
+      {'memoriesPayloadOmitted' in mind && mind.memoriesPayloadOmitted > 0 && (
+        <p className="muted">{mind.memoriesPayloadOmitted} additional memories retained in the controller but omitted from this summary</p>
+      )}
+    </details>
   );
 }

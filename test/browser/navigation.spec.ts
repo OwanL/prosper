@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import { createWorld } from '../../src/world/core';
 
 async function offline(page: Page) {
@@ -10,6 +10,7 @@ async function offline(page: Page) {
   const snapshot: AppSnapshot = {
     world,
     status: {
+      decisionTreeDebug: false,
       state: 'ready',
       running: false,
       speed: 1,
@@ -35,7 +36,7 @@ async function offline(page: Page) {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === 'GET' && path === '/api/state')
-      await route.fulfill({ json: snapshot });
+      await route.fulfill({ json: spectatorFixture(snapshot) });
     else if (route.request().method() === 'GET' && path === '/api/history/global')
       await route.fulfill({
         json: {

@@ -64,34 +64,32 @@ describe('continuous local autonomy',()=> {
     expect(setAutonomyPolicy(first.world,first.a,{territory:[0,0,100,100]}).ok).toBe(false);
     expect(first.a.autonomy!.policy.territory).toEqual([3,3,6,6]);
   });
-  it('keeps an explicit rejection of parenthood binding despite received proposals',()=> {
+  it('does not create family consent offers even when a legacy policy seeks parenthood',()=> {
     const {world,a,b}=fixture();
     a.inventory=b.inventory={'food:2':8};
     enableAutonomy(world,a,{reproduction:'seek',partnerId:b.id});
     enableAutonomy(world,b,{reproduction:'avoid'});
-    relationship(a,b.id).trust=40;relationship(b,a.id).trust=40;
     run(world,150);
     expect(b.consent[a.id]).toBeUndefined();
     expect(Object.values(world.citizens).length).toBe(2);
-    expect(b.autonomy!.signals?.some((s)=>s.kind==='family-offer'&&s.from===a.id)).toBe(true);
+    expect(b.autonomy!.signals?.some((s)=>s.kind==='family-offer'&&s.from===a.id)).toBe(false);
   });
-  it('uses an actual mutual rendezvous and ready receipts to reproduce, preserving gold and inheriting bounded traits',()=> {
+  it('reproduces with an adjacent eligible partner without consent, preserving gold and inherited traits',()=> {
     const {world,a,b}=fixture();
-    a.inventory={'food:2':9};b.inventory={'food:2':9};
+    b.x=a.x; b.y=a.y;
+    a.inventory={'food:1':9};b.inventory={'food:1':9};
     enableAutonomy(world,a,{reproduction:'seek',partnerId:b.id});
     enableAutonomy(world,b,{reproduction:'open',partnerId:a.id});
     relationship(a,b.id).trust=30;relationship(b,a.id).trust=30;
     run(world,100);
     const child=Object.values(world.citizens).find((c)=>c.parents.length===2);
     expect(child).toBeDefined();
-    expect(child!.parents).toEqual([a.id,b.id]);
-    expect(child!.gold).toBe(0);
+    expect(child!.parents).toEqual([a.id,b.id]); expect(child!.gold).toBe(0);
     for(const [key,value] of Object.entries(child!.autonomy!.traits)) {
       const average=(a.autonomy!.traits[key as keyof CitizenTraits]+b.autonomy!.traits[key as keyof CitizenTraits])/2;
       expect(Math.abs(value-average)).toBeLessThanOrEqual(.100001);
     }
-    expect(a.consent[b.id]).toBeUndefined();
-    expect(b.consent[a.id]).toBeUndefined();
+    expect(a.consent[b.id]).toBeUndefined();expect(b.consent[a.id]).toBeUndefined();
     expect(gold(world)).toBe(world.initialGold);
   });
   it('does not turn one alliance proposal into another citizen accepting it',()=> {

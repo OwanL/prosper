@@ -10,6 +10,8 @@ import { EQUIPMENT, RESOURCES } from './config.ts';
 // Commodity keys are bounded by the configured economy, never unique building IDs.
 const commodities = [...RESOURCES, ...EQUIPMENT].flatMap((kind) => TIERS.map((tier) => `${kind}:${tier}`));
 const commoditySet = new Set(commodities);
+// Sample new frames defensively; retained history and authoritative state are untouched.
+const currencyRoundoff = (value: number) => value < 0 && value >= -1e-9 ? 0 : value;
 
 function frame(world: World, telemetry: WorldTelemetry): HistoryFrame {
   const previous = telemetry.frames.at(-1);
@@ -32,7 +34,7 @@ function frame(world: World, telemetry: WorldTelemetry): HistoryFrame {
   };
   const escrow: Record<string, number> = {};
   for (const order of Object.values(world.orders)) {
-    escrow[order.citizenId] = (escrow[order.citizenId] ?? 0) + order.escrowGold;
+    escrow[order.citizenId] = (escrow[order.citizenId] ?? 0) + currencyRoundoff(order.escrowGold);
     const market = markets[order.item];
     if (!market) continue;
     if (order.side === 'buy') {
@@ -57,7 +59,7 @@ function frame(world: World, telemetry: WorldTelemetry): HistoryFrame {
     }
     if (citizen.alive || previous?.citizens[citizen.id]?.alive) {
       citizens[citizen.id] = {
-        alive: citizen.alive, cash: citizen.gold, escrow: escrow[citizen.id] ?? 0,
+        alive: citizen.alive, cash: currencyRoundoff(citizen.gold), escrow: currencyRoundoff(escrow[citizen.id] ?? 0),
         health: citizen.health, fullness: citizen.fullness,
       };
     }

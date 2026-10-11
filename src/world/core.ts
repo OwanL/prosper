@@ -4,13 +4,20 @@ import type {
   Citizen,
   Command,
   CommandResult,
+  DeliveryReceipt,
   Inventory,
+  ItemKey,
   Point,
   Resource,
+  Territory,
   Tier,
   World,
 } from '../shared/types.ts';
 import { TIERS } from '../shared/types.ts';
+import type { ReputationLevel } from '../shared/territory-types.ts';
+import { REPUTATION_LEVELS } from '../shared/territory-types.ts';
+import { MIND_LIMITS } from '../shared/tree-types.ts';
+import type { CitizenMind } from '../shared/tree-types.ts';
 import { strategyAllowed, validateWorldAuthority, type WorldControlOptions } from './evaluation-authority.ts';
 export type { CitizenAuthority, EvaluationAuthority, WorldControlOptions } from './evaluation-authority.ts';
 import { RING_COUNT, MAX_TIER, CARRIED_ITEM_RE } from '../shared/tiers.ts';
@@ -31,9 +38,11 @@ import {
   BALANCE,
   BUILDINGS,
   buildingRecipe,
+  COMPOSED_BALANCE,
   EQUIPMENT,
   equipmentRecipe,
   harvestDuration,
+  houseRecipe,
   MATCHING_TOOL,
   nutrition,
   RESOURCES,
@@ -46,7 +55,7 @@ import { findPath, inBounds, neighbors, walkable } from './pathfinding.ts';
 import { startingCharacter } from './characters.ts';
 import { LEGACY_FIRST_NAMES } from './name-data.ts';
 import { allocateCitizenName } from './names.ts';
-import { validateKnownCommand } from './observation.ts';
+import { refreshVisibleKnowledge, validateKnownCommand } from './observation.ts';
 import { advancePlan, discardPlan, planActionResult } from './plans.ts';
 import {
   advanceDirectives,
@@ -57,18 +66,68 @@ import {
 import { advanceEmergency, beginEmergency } from './emergency.ts';
 import { advanceAutonomy, enableAutonomy, reactAutonomy } from './autonomy.ts';
 import { maintainSociety, witnessHarvest } from './society.ts';
+import {
+  canBuildInTerritory,
+  canUseTerritoryBuilding,
+  destroyTerritorySign,
+  handleTerritoryCommand,
+  maintainTerritories,
+  territoryAt,
+  territoryOf,
+} from './territory.ts';
+import {
+  changeReputation,
+  witnessMemberAttack,
+  witnessStructureAttack,
+  witnessTerritoryHarvest,
+  witnessTerritoryTrespass,
+} from './reputation.ts';
+import { initializeDispositions } from '../citizen/tree-selection.ts';
+
 import { highestToolTier } from '../shared/tool-utils.ts';
 import { isBuildingListed, marketCommand } from './market.ts';
 import { ensureTelemetry, sampleTelemetry } from './telemetry.ts';
 import {
   advanceLifeAction,
-  consentCommand,
   isLifeAction,
   releaseAction,
   settleDeath,
   startLifeAction,
   validateLifeCommand,
 } from './life.ts';
+import { advanceTree } from './tree-controller.ts';
+
+/** The composed controller `advanceTree(world, citizen): boolean` is imported
+ * statically: ordinary ESM resolves the cycle (tree-controller calls this
+ * module's exported `dispatch`) because the controller only invokes `dispatch`
+ * inside function bodies, never at module evaluation. There is no asynchronous
+ * readiness step — the first composed tick of a fresh world already routes
+ * through the composed tree, and a failed load can never silently strand
+ * composed citizens in inert bodies. */
+
+/** Mind bootstrap seeds stay deterministic from world seed and citizen identity. */
+function mindSeed(world: World, citizenId: string): number {
+  let hash = (2166136261 ^ world.seed) >>> 0;
+  for (const character of citizenId) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0;
+  return hash || 1;
+}
+/** Bodies always track rest in composed worlds; minds bootstrap as empty shells. */
+export function ensureComposedBody(world: World, citizen: Citizen): void {
+  if (world.controllerMode !== 'composed') return;
+  citizen.rest ??= { value: COMPOSED_BALANCE.maxRest };
+  if (!citizen.mind)
+    citizen.mind = {
+      version: 1,
+      dispositions: initializeDispositions(mindSeed(world, citizen.id)),
+      memories: [],
+      memoriesOmitted: 0,
+      tasks: [],
+      receipts: [],
+      trace: [],
+      traceOmitted: 0,
+      nextDirectorTick: COMPOSED_BALANCE.directorIntervalTicks,
+    };
+}
 
 const physicalTypes = new Set([
   'move',
@@ -79,6 +138,20 @@ const physicalTypes = new Set([
   'attack',
   'loot',
   'reproduce',
+  'attack-sign',
+  'build-house',
+  'sleep',
+]);
+/** Mechanics that exist only in composed worlds; legacy mode stays untouched. */
+const composedOnlyTypes = new Set([
+  'create-territory',
+  'expand-territory',
+  'join-territory',
+  'vote-territory',
+  'leave-territory',
+  'attack-sign',
+  'build-house',
+  'sleep',
 ]);
 const validTier = (tier: number): tier is Tier => TIERS.includes(tier as Tier);
 const sameTile = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
@@ -89,11 +162,30 @@ const toolTier = (citizen: Citizen, resource: Resource): number => {
 
 /** Seeded, serializable creation. Only this function mints gold. */
 export function createWorld(
-  options: { seed?: number; scenario?: string; runId?: string; autonomy?: boolean; population?: number } = {},
+  options: {
+    seed?: number;
+    scenario?: string;
+    runId?: string;
+    autonomy?: boolean;
+    population?: number;
+    /** Composed mode mints rest and a seeded mind shell for every founder. */
+    controllerMode?: 'legacy' | 'composed';
+  } = {},
 ): World {
   const scenario = options.scenario ?? 'village';
   if (!['village', 'competition', 'progression'].includes(scenario))
     throw new Error(`Unknown scenario: ${scenario}`);
+  const controllerMode = options.controllerMode ?? 'legacy';
+  if (!['legacy', 'composed'].includes(controllerMode))
+    throw new Error(`Unknown controller mode: ${controllerMode}`);
+  // Composed enable state is declared once through the user API: controllerMode
+  // selects the controller family and composed worlds must never also enable the
+  // legacy autonomy bots. Restored worlds opt in by an explicit post-load
+  // assignment (runtime restore migration), never by silent world mutation.
+  if (controllerMode === 'composed' && options.autonomy)
+    throw new Error(
+      'Composed worlds route exclusively through the tree controller; legacy autonomy cannot be enabled.',
+    );
   const seed = (options.seed ?? 1) >>> 0;
   const count = options.population ?? (scenario === 'competition' ? 9 : scenario === 'progression' ? 3 : BALANCE.initialCitizens);
   if (!Number.isInteger(count) || count < 1 || count > 250) throw new Error('Population must be an integer from 1 to 250.');
@@ -118,6 +210,7 @@ export function createWorld(
     loot: {},
     messages: [],
     events: [],
+    ...(controllerMode === 'composed' ? { controllerMode: 'composed' as const } : {}),
   };
   // Each inward band advances one tier, occasionally yielding the next tier.
   // The rare center tier is not clamped; supported tiers derive from RING_COUNT.
@@ -230,6 +323,7 @@ export function createWorld(
       parents: [],
     };
     world.initialGold += BALANCE.startingGold;
+    if (controllerMode === 'composed') ensureComposedBody(world, world.citizens[citizenId]);
     if (options.autonomy) enableAutonomy(world, world.citizens[citizenId],count>9?{livelihood:RESOURCES[i%RESOURCES.length]}:{});
   }
   // A founder needs two discoverable edible sites: one T1 plant's 40 work +
@@ -263,6 +357,34 @@ export function createWorld(
     }
     reserveSites();
   }
+  // Preserve the historical seeded supply calculation and founder starts above,
+  // then concentrate its extra forage in the food third. This is creation only:
+  // restored maps never pass through here. No RNG draws, new stock, or changes
+  // to tiers/capacity/regrowth are introduced by relocation.
+  const foodSector = RESOURCES.indexOf('food');
+  const sectorAt = (point: Point) => Math.min(2, Math.floor(
+    (Math.atan2(point.y - (world.height - 1) / 2, point.x - (world.width - 1) / 2) + Math.PI) /
+    ((2 * Math.PI) / 3)));
+  const slots: Point[][] = Array.from({ length: RING_COUNT }, () => []);
+  for (let y = 0; y < world.height; y++)
+    for (let x = 0; x < world.width; x++) {
+      const point = { x, y };
+      if (sectorAt(point) === foodSector && !occupied.has(`${x},${y}`))
+        slots[ringAt(world, point)].push(point);
+    }
+  for (const deposit of Object.values(world.deposits)) {
+    if (deposit.resource !== 'food' || sectorAt(deposit) === foodSector) continue;
+    const pool = slots[ringAt(world, deposit)];
+    // Nearest valid tile; scan order breaks ties deterministically. Never
+    // overwrite another resource or spill into a different band/sector.
+    let best = 0;
+    for (let i = 1; i < pool.length; i++)
+      if (distance(deposit, pool[i]) < distance(deposit, pool[best])) best = i;
+    const point = pool.splice(best, 1)[0];
+    if (!point) throw new Error('Food sector has insufficient unoccupied generation slots.');
+    deposit.x = point.x;
+    deposit.y = point.y;
+  }
   ensureTelemetry(world);
   return world;
 }
@@ -285,10 +407,199 @@ function report(
 /** Returns work inputs exactly once. Harvest stock is claimed by active-action
  * scans, not copied into inventory; cancelling simply releases that claim. */
 export function cancelAction(world: World, citizenId: string, clearQueue = true): void {
+  const citizen = world.citizens[citizenId];
+  if (citizen?.action?.command.type === 'sleep' && citizen.rest) delete citizen.rest.sleepingHouseId;
   releaseAction(world, citizenId, clearQueue);
 }
 
-function requirements(world: World, citizen: Citizen, command: Command): CommandResult {
+/** Bounded receipt-ledger retention that keeps every checkpoint allocation
+ * resolvable. A receipt allocated (requestId stamped) to a RUNNING request is
+ * running credit — waiting to be credited into `receiptIds` or already there —
+ * and is never evicted, because a checkpoint demand requires every task's
+ * receiptIds entry to resolve in the retained ledger with exact sums. Receipts
+ * allocated to terminal (non-running) tasks may be evicted, but only with
+ * their allocations pruned and the exact retained `delivered` sum recomputed
+ * in the same atomic operation (advanceTree derives identical state on its
+ * next pass). If running allocations alone would overflow the bounded ledger,
+ * the oldest same-request receipts of a running task are merged into one
+ * exact-sum aggregate receipt, so a long-running task can never push retention
+ * past MIND_LIMITS.receipts and no net credit is ever silently discarded. */
+function trimReceiptLedger(world: World, citizen: Citizen, mind: CitizenMind): void {
+  const overflow = mind.receipts.length - MIND_LIMITS.receipts;
+  if (overflow <= 0) return;
+  const runningRequests = new Set(
+    mind.tasks.filter((task) => task.status === 'running').map((task) => task.request.id),
+  );
+  // 1) Evict the oldest receipts not reserved for running credit.
+  const evictable = mind.receipts.filter(
+    (receipt) => receipt.requestId === undefined || !runningRequests.has(receipt.requestId),
+  );
+  const evicted = new Set(evictable.slice(0, overflow).map((receipt) => receipt.id));
+  let remaining = overflow - evicted.size;
+  // 2) Emergency aggregation: running allocations alone fill the ledger.
+  if (remaining > 0) {
+    const dropReceipt = (receiptId: string) => {
+      mind.receipts = mind.receipts.filter((receipt) => receipt.id !== receiptId);
+    };
+    const runningTasks = mind.tasks.filter((task) => task.status === 'running');
+    while (remaining > 0) {
+      let merged = false;
+      for (const task of runningTasks) {
+        const requestItem = itemKey(task.request.resource, task.request.tier);
+        while (remaining > 0) {
+          // Same request and item: the checkpoint allocation invariant binds
+          // every receiptIds entry to exactly that pair, so merged evidence
+          // substitutes verbatim. Ledger order is arrival order, so the first
+          // two members are the oldest retained receipts of this request.
+          const group = mind.receipts.filter(
+            (receipt) => receipt.requestId === task.request.id && receipt.item === requestItem,
+          );
+          if (group.length < 2) break;
+          const [first, second] = [group[0]!, group[1]!];
+          // Preserve the later timestamp so an aggregate never appears newer
+          // than the world tick that actually produced its inputs.
+          const aggregate: DeliveryReceipt = {
+            id: id(world, 'receipt'),
+            settlementId: `aggregate:${first.id}+${second.id}`,
+            tick: Math.max(first.tick, second.tick),
+            citizenId: citizen.id,
+            item: first.item,
+            quantity: first.quantity + second.quantity,
+            source: first.source,
+            ...(first.requestId ? { requestId: first.requestId } : {}),
+          };
+          dropReceipt(first.id);
+          dropReceipt(second.id);
+          const position = mind.receipts.findIndex((receipt) => receipt.tick > aggregate.tick);
+          if (position === -1) mind.receipts.push(aggregate);
+          else mind.receipts.splice(position, 0, aggregate);
+          if (task.receiptIds.includes(first.id) || task.receiptIds.includes(second.id)) {
+            // Allocation bookkeeping follows the merged evidence atomically:
+            // the aggregate replaces the merged ids and the exact retained
+            // sum of `delivered` is recomputed from the surviving allocation.
+            task.receiptIds = task.receiptIds.filter(
+              (receiptId) => receiptId !== first.id && receiptId !== second.id,
+            );
+            if (aggregate.requestId === task.request.id) task.receiptIds.push(aggregate.id);
+            const aggregated = new Map(mind.receipts.map((receipt) => [receipt.id, receipt]));
+            task.delivered = task.receiptIds.reduce(
+              (sum, receiptId) => sum + (aggregated.get(receiptId)?.quantity ?? 0),
+              0,
+            );
+          }
+          remaining--;
+          merged = true;
+        }
+        if (remaining <= 0) break;
+      }
+      if (!merged) break;
+    }
+  }
+  mind.receipts = mind.receipts.filter((receipt) => !evicted.has(receipt.id));
+  // 3) Atomic terminal-allocation pruning: evicted receipt ids leave terminal
+  // tasks with their exact retained sum recomputed in the same pass.
+  const retained = new Map(mind.receipts.map((receipt) => [receipt.id, receipt]));
+  for (const task of mind.tasks) {
+    if (task.status === 'running') continue;
+    if (task.receiptIds.every((receiptId) => retained.has(receiptId))) continue;
+    task.receiptIds = task.receiptIds.filter((receiptId) => retained.has(receiptId));
+    task.delivered = task.receiptIds.reduce((sum, receiptId) => sum + retained.get(receiptId)!.quantity, 0);
+  }
+}
+
+/** Record one unique net delivery receipt on the recipient's composed mind.
+ * Physical/recovery receipts retain active exact-item allocation. Market
+ * settlement supplies the request captured at posting (or explicit unowned
+ * background provenance), never the task that happens to be active at fill.
+ * Consumption never erases a delivery. */
+function recordDelivery(
+  world: World,
+  citizen: Citizen,
+  delivery: {
+    item: ItemKey;
+    quantity: number;
+    source: DeliveryReceipt['source'];
+    settlementId: string;
+    requestId?: string | null;
+  },
+): DeliveryReceipt | undefined {
+  if (!citizen.mind || !(delivery.quantity > 0) || !Number.isFinite(delivery.quantity)) return undefined;
+  const mind = citizen.mind;
+  const task = mind.activeTaskId
+    ? mind.tasks.find((entry) => entry.id === mind.activeTaskId && entry.status === 'running')
+    : undefined;
+  const receipt: DeliveryReceipt = {
+    id: id(world, 'receipt'),
+    settlementId: delivery.settlementId,
+    tick: world.tick,
+    citizenId: citizen.id,
+    item: delivery.item,
+    quantity: delivery.quantity,
+    source: delivery.source,
+  };
+  if (delivery.requestId !== undefined) {
+    if (delivery.requestId !== null) receipt.requestId = delivery.requestId;
+  } else if (task && itemKey(task.request.resource, task.request.tier) === delivery.item)
+    receipt.requestId = task.request.id;
+  mind.receipts.push(receipt);
+  trimReceiptLedger(world, citizen, mind);
+  return receipt;
+}
+
+/** Actually visible territory members other than the actor; no omniscient reactions. */
+function memberWitnesses(world: World, territory: Territory, actorId: string, point: Point): Citizen[] {
+  return Object.keys(territory.members)
+    .filter((memberId) => memberId !== actorId)
+    .map((memberId) => world.citizens[memberId])
+    .filter((member): member is Citizen => !!member?.alive && distance(member, point) <= BALANCE.sightRadius);
+}
+
+/** A step into a foreign territory tile is sanctioned only when a member can
+ * actually see the mover's new position; reputation.ts owns the per
+ * territory/actor/offense cooldown that keeps repeated steps idempotent. */
+function witnessComposedTrespass(world: World, mover: Citizen): void {
+  const territory = territoryAt(world, mover);
+  if (!territory || territory.members[mover.id]) return;
+  for (const witness of memberWitnesses(world, territory, mover.id, mover))
+    witnessTerritoryTrespass(world, mover.id, witness.id, mover);
+}
+
+/** Witnessed attack consequences are reputation-only; no hook ever issues attacks.
+ * Citizen attacks are passed through unchanged; structure strikes inside a
+ * territory additionally sanction against every member who saw the building. */
+function witnessComposedEngagement(world: World, attacker: Citizen, targetId: string): void {
+  const victim = world.citizens[targetId];
+  if (victim) {
+    witnessComposedAttack(world, attacker, targetId);
+    return;
+  }
+  const building = world.buildings[targetId] ?? world.houses?.[targetId];
+  if (!building) return;
+  const territory = territoryAt(world, building);
+  if (!territory || territory.members[attacker.id]) return;
+  for (const witness of memberWitnesses(world, territory, attacker.id, building))
+    witnessStructureAttack(world, attacker.id, witness.id, building);
+}
+
+/** Witnessed attack consequences are reputation-only; no hook ever issues attacks.
+ * Called at actual engagement (adjacent in-range strikes), never at remote
+ * command acceptance; the reputation.ts sanction cooldown makes repeated
+ * adjacency ticks idempotent, including the killing blow. */
+function witnessComposedAttack(world: World, attacker: Citizen, targetId: string): void {
+  const victim = world.citizens[targetId];
+  if (!victim?.alive || victim.id === attacker.id) return;
+  const territory = territoryOf(world, victim.id);
+  if (!territory) {
+    // An unaffiliated victim: only their own directed view drops to the minimum.
+    changeReputation(world, victim.id, attacker.id, -(REPUTATION_LEVELS.length - 1));
+    return;
+  }
+  // The victim always knows they are being attacked; nearby members may also see it.
+  for (const witness of [victim, ...memberWitnesses(world, territory, attacker.id, victim)])
+    if (witness.id !== attacker.id) witnessMemberAttack(world, attacker.id, witness.id);
+}
+
+function requirements(world: World, citizen: Citizen, command: Command, ongoing = false): CommandResult {
   const otherActions = Object.values(world.citizens)
     .filter((c) => c.alive && c.id !== citizen.id)
     .flatMap((c) => [c.action, c.emergency?.suspendedAction])
@@ -301,13 +612,12 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
     case 'harvest': {
       const deposit = world.deposits[command.depositId];
       if (!deposit) return fail('missing-deposit', 'That deposit no longer exists.');
-      const claimed = otherActions.filter(
-        (a) => a.command.type === 'harvest' && a.command.depositId === deposit.id,
-      ).length;
-      if (deposit.stock <= claimed)
+      // Starting requires actual stock, but ongoing competitors settle only at
+      // completion: intervening depletion or regrowth is not a reservation.
+      if (!ongoing && deposit.stock < 1)
         return fail(
           'depleted-deposit',
-          'Deposit is depleted or reserved; wait for regrowth or choose another.',
+          'Deposit is depleted; wait for regrowth or choose another.',
         );
       if (deposit.tier > Math.min(MAX_TIER, toolTier(citizen, deposit.resource) + 1)) {
         return fail(
@@ -342,7 +652,65 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
         Object.values(world.citizens).some((c) => c.alive && sameTile(c, command))
       )
         return fail('occupied-site', 'A wall cannot be placed on a citizen.');
+      if (
+        world.controllerMode === 'composed' &&
+        (Object.values(world.houses ?? {}).some((h) => sameTile(h, command)) ||
+          Object.values(world.citizens).some((c) => c.alive && c.id !== citizen.id && sameTile(c, command)))
+      )
+        return fail('occupied-site', 'Buildings cannot cover a house or a citizen.');
+      if (world.controllerMode === 'composed') {
+        const territoryGate = canBuildInTerritory(world, citizen.id, command);
+        if (!territoryGate.ok) return territoryGate;
+      }
       return ok('Site available.');
+    }
+    case 'build-house': {
+      if (!validTier(command.tier))
+        return fail('invalid-building', `Build a house of tier 1 through ${MAX_TIER}.`);
+      if (!inBounds(world, command))
+        return fail('invalid-destination', 'Build at whole coordinates inside the map.');
+      if (
+        Object.values(world.buildings).some((b) => sameTile(b, command)) ||
+        Object.values(world.deposits).some((d) => sameTile(d, command)) ||
+        Object.values(world.houses ?? {}).some((h) => sameTile(h, command)) ||
+        Object.values(world.citizens).some((c) => c.alive && c.id !== citizen.id && sameTile(c, command))
+      )
+        return fail('occupied-site', 'Houses cannot cover another house, building, deposit or citizen.');
+      if (
+        otherActions.some(
+          (a) =>
+            (a.command.type === 'build' || a.command.type === 'build-house') &&
+            sameTile(a.command, command),
+        )
+      )
+        return fail('reserved-site', 'Another construction action has reserved this tile.');
+      return canBuildInTerritory(world, citizen.id, command);
+    }
+    case 'attack-sign': {
+      const sign = world.signs?.[command.signId];
+      if (!sign) return fail('missing-sign', 'That sign no longer exists.');
+      if (sign.health <= 0) return fail('destroyed-sign', 'That sign is already destroyed.');
+      return ok('The sign can be attacked.');
+    }
+    case 'sleep': {
+      const rest = citizen.rest;
+      if (!rest) return fail('no-rest', 'This citizen does not track rest.');
+      if (!Number.isFinite(command.targetRest) || command.targetRest <= 0 || command.targetRest > COMPOSED_BALANCE.maxRest)
+        return fail('invalid-rest-target', `Choose a rest target above 0 and up to ${COMPOSED_BALANCE.maxRest}.`);
+      // A running sleep action legitimately reaches its target mid-rest; only a
+      // fresh command whose target is already met is refused.
+      const alreadyRunningThisSleep =
+        citizen.action?.command.type === 'sleep' &&
+        citizen.action.command.targetRest === command.targetRest;
+      if (!alreadyRunningThisSleep && rest.value >= command.targetRest)
+        return fail('rest-satisfied', 'Rest already meets the target.');
+      if (command.houseId !== undefined) {
+        const house = world.houses?.[command.houseId];
+        if (!house) return fail('missing-house', 'That house no longer exists.');
+        if (!canUseTerritoryBuilding(world, citizen.id, house))
+          return fail('no-house-access', 'Only the owner and current territory members sleep in that house.');
+      }
+      return ok('Sleeping is available.');
     }
     case 'refine': {
       const building = world.buildings[command.buildingId];
@@ -350,7 +718,11 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
         return fail('missing-station', 'That station no longer exists.');
       if (!STATION_RESOURCE[building.kind])
         return fail('not-station', 'Walls cannot refine materials.');
-      if (building.ownerId !== citizen.id)
+      // Composed worlds add shared use: the owner and current members of the
+      // territory at the station tile; ownership never transfers by membership.
+      const sharedStationUse =
+        world.controllerMode === 'composed' && canUseTerritoryBuilding(world, citizen.id, building);
+      if (building.ownerId !== citizen.id && !sharedStationUse)
         return fail('not-owner', 'Only a station owner can operate it.');
       if (isBuildingListed(world, building.id))
         return fail('listed-station', 'Delist the station before processing.');
@@ -370,22 +742,46 @@ function requirements(world: World, citizen: Citizen, command: Command): Command
 function costFor(world: World, command: Command): Inventory {
   if (command.type === 'craft') return equipmentRecipe(command.item, command.tier);
   if (command.type === 'build') return buildingRecipe(command.kind, command.tier);
+  if (command.type === 'build-house') return houseRecipe(command.tier);
   if (command.type === 'refine')
     return refinementRecipe(STATION_RESOURCE[world.buildings[command.buildingId].kind]!, command.fromTier, command.direction);
   return {};
+}
+
+/** Fatigue slows productive work, not travel; rest at or above the threshold works normally. */
+const fatigueFactor = (world: World, citizen: Citizen): number =>
+  world.controllerMode === 'composed' &&
+  (citizen.rest?.value ?? COMPOSED_BALANCE.maxRest) < COMPOSED_BALANCE.fatigueThreshold
+    ? COMPOSED_BALANCE.fatigueDurationMultiplier
+    : 1;
+
+/** House rest requires actual shared-use access; higher tiers currently restore at the same flat rate. */
+function restRate(world: World, citizen: Citizen, houseId?: string): number {
+  const house = houseId !== undefined ? world.houses?.[houseId] : undefined;
+  return house && canUseTerritoryBuilding(world, citizen.id, house)
+    ? COMPOSED_BALANCE.houseRestPerTick
+    : COMPOSED_BALANCE.outdoorRestPerTick;
 }
 function durationFor(world: World, citizen: Citizen, command: Command): number {
   switch (command.type) {
     case 'harvest': {
       const deposit = world.deposits[command.depositId];
-      return harvestDuration(deposit.tier, toolTier(citizen, deposit.resource));
+      return harvestDuration(deposit.tier, toolTier(citizen, deposit.resource)) * fatigueFactor(world, citizen);
     }
     case 'craft':
-      return BALANCE.craftTicks;
+      return BALANCE.craftTicks * fatigueFactor(world, citizen);
     case 'build':
-      return BALANCE.buildTicks;
+    case 'build-house':
+      return BALANCE.buildTicks * fatigueFactor(world, citizen);
     case 'refine':
-      return BALANCE.refineTicks[world.buildings[command.buildingId].tier];
+      return BALANCE.refineTicks[world.buildings[command.buildingId].tier] * fatigueFactor(world, citizen);
+    case 'attack-sign':
+      return COMPOSED_BALANCE.signAttackTicks;
+    case 'sleep': {
+      const rest = citizen.rest?.value ?? 0;
+      const rate = restRate(world, citizen, command.houseId);
+      return Math.max(COMPOSED_BALANCE.sleepMinimumTicks, Math.ceil((command.targetRest - rest) / rate));
+    }
     default:
       return BALANCE.moveTicks;
   }
@@ -396,9 +792,13 @@ function routeFor(
   command: Command,
 ): { target: Point; path: Point[] } | null {
   let target: Point = { x: citizen.x, y: citizen.y };
-  if (command.type === 'move' || command.type === 'build') target = { x: command.x, y: command.y };
+  if (command.type === 'move' || command.type === 'build' || command.type === 'build-house')
+    target = { x: command.x, y: command.y };
   if (command.type === 'harvest') target = world.deposits[command.depositId];
   if (command.type === 'refine') target = world.buildings[command.buildingId];
+  if (command.type === 'attack-sign') target = world.signs?.[command.signId] ?? target;
+  if (command.type === 'sleep' && command.houseId !== undefined)
+    target = world.houses?.[command.houseId] ?? target;
   if (command.type === 'build' && command.kind === 'wall') {
     const routes = neighbors(target)
       .map((p) => ({ target: p, path: findPath(world, citizen, p) }))
@@ -419,7 +819,7 @@ function startAction(
   if (isLifeAction(command)) return startLifeAction(world, citizen, command, replace);
   // Activation (including queued work) must not probe remote site occupants or claims.
   if (
-    command.type === 'build' &&
+    (command.type === 'build' || command.type === 'build-house') &&
     inBounds(world, command) &&
     distance(citizen, command) > BALANCE.sightRadius
   ) {
@@ -442,6 +842,10 @@ function startAction(
   // Validate before replacing, so an invalid command preserves unfinished work.
   if (replace) cancelAction(world, citizen.id);
   takeInventory(citizen.inventory, reserved);
+  if (command.type === 'sleep' && command.houseId !== undefined) {
+    citizen.rest ??= { value: 0 };
+    citizen.rest.sleepingHouseId = command.houseId;
+  }
   citizen.action = {
     id: id(world, 'action'),
     command: { ...command },
@@ -462,6 +866,7 @@ export function dispatch(
   command: Command,
   source: 'external' | 'plan' | 'directive' = 'external',
   options?: WorldControlOptions,
+  marketRequestId?: string | null,
 ): CommandResult {
   // The runner owns candidate/setup/scheduled external commands. Controllers
   // cannot use plan/directive authority to issue competing strategic commands.
@@ -476,6 +881,8 @@ export function dispatch(
     return report(world, citizen, fail('invalid-command', 'Provide a command object with a type.'));
   if (command.queue !== undefined && command.queue !== 'replace' && command.queue !== 'append')
     return report(world, citizen, fail('invalid-queue', 'Queue mode must be replace or append.'));
+  if (composedOnlyTypes.has(command.type) && world.controllerMode !== 'composed')
+    return report(world, citizen, fail('unsupported-command', 'This command requires a composed world.'));
   let result: CommandResult;
   if (physical(command)) {
     const shape = isLifeAction(command)
@@ -498,13 +905,64 @@ export function dispatch(
         cancelAction(world, citizen.id);
         result = ok('Cancelled physical work and queue; unused inputs returned.');
         break;
-      case 'order':
-      case 'cancel-order':
+      case 'order': {
+        const activeOwner = citizen.mind?.tasks.find(t => t.id === citizen.mind?.activeTaskId && t.status === 'running' && itemKey(t.request.resource, t.request.tier) === command.item);
+        const creationRequestId = marketRequestId === undefined ? activeOwner?.request.id : marketRequestId;
+        const deliveries: DeliveryReceipt[] = [];
+        result = marketCommand(world, citizenId, command, (buy, quantity) => {
+          const buyer = world.citizens[buy.citizenId];
+          const owner = buyer.mind?.tasks.find(t => t.ownedOrderIds.includes(buy.id));
+          const requestId = buy.requestId !== undefined ? buy.requestId : owner?.request.id;
+          const receipt = recordDelivery(world, buyer, {
+            item: buy.item, quantity, source: 'market', settlementId: `market:${buy.id}`,
+            requestId: requestId ?? null,
+          });
+          if (receipt && buyer.id === citizenId) deliveries.push(receipt);
+        }, creationRequestId);
+        if (deliveries.length) result.deliveries = deliveries;
+        break;
+      }
+      case 'cancel-order': {
+        // Capture escrow before marketCommand refunds and deletes the order.
+        const escrow =
+          world.controllerMode === 'composed' && citizen.mind
+            ? { ...(world.orders[command.orderId]?.escrowItems ?? {}) }
+            : {};
+        result = marketCommand(world, citizenId, command);
+        if (result.ok && citizen.mind) {
+          const deliveries = Object.entries(escrow)
+            .filter(([, quantity]) => quantity > 0)
+            .map(([item, quantity]) =>
+              recordDelivery(world, citizen, {
+                item: item as ItemKey,
+                quantity,
+                source: 'recovery',
+                settlementId: `cancel:${command.orderId}`,
+              }));
+          const settled = deliveries.filter((receipt): receipt is DeliveryReceipt => !!receipt);
+          if (settled.length) result.deliveries = settled;
+        }
+        break;
+      }
       case 'transfer':
         result = marketCommand(world, citizenId, command);
         break;
+      case 'create-territory':
+      case 'expand-territory':
+      case 'join-territory':
+      case 'vote-territory':
+      case 'leave-territory':
+        // Observation overlays fresh sight without mutating the notebook. The
+        // territory validator reads committed knowledge, so synchronize local
+        // sight before validating coordinate claims; never refresh remote land.
+        if (command.type === 'create-territory' || command.type === 'expand-territory')
+          refreshVisibleKnowledge(world, citizen);
+        result =
+          handleTerritoryCommand(world, citizen, command) ??
+          fail('unsupported-command', 'Territory command not supported.');
+        break;
       case 'consent':
-        result = consentCommand(world, citizen, command);
+        result = fail('unsupported-command', 'Consent commands are deprecated; reproduction needs no consent.');
         break;
       case 'give': {
         const recipient=world.citizens[command.citizenId];
@@ -626,14 +1084,72 @@ function finishAction(world: World, citizen: Citizen): void {
   switch (command.type) {
     case 'harvest': {
       const deposit = world.deposits[command.depositId];
+      if (!deposit || deposit.stock < 1) {
+        failAction(world, citizen, fail('depleted-deposit', 'Deposit depleted before harvest completed; no yield delivered.'));
+        return;
+      }
       deposit.stock--;
       if (deposit.stock < deposit.capacity) deposit.regrowAt = world.tick + BALANCE.regrowTicks;
-      addInventory(citizen.inventory, { [itemKey(deposit.resource, deposit.tier)]: 1 });
-      witnessHarvest(world, citizen, deposit);
+      const composed = world.controllerMode === 'composed';
+      const item = itemKey(deposit.resource, deposit.tier);
+      // Fractional territory tax: the owner receives the fixed share, the
+      // harvester the NET remainder; both receipts carry actual delivered amounts.
+      let received = 1;
+      const territory = composed ? territoryAt(world, deposit) : undefined;
+      if (territory) {
+        const owner = territory.ownerId === citizen.id ? undefined : world.citizens[territory.ownerId];
+        if (owner?.alive) {
+          const tax = COMPOSED_BALANCE.territoryTaxRate;
+          received = 1 - tax;
+          addInventory(owner.inventory, { [item]: tax });
+          recordDelivery(world, owner, { item, quantity: tax, source: 'tax', settlementId: `harvest:${action.id}` });
+        }
+        for (const witness of memberWitnesses(world, territory, citizen.id, deposit))
+          witnessTerritoryHarvest(world, citizen.id, witness.id, deposit);
+      }
+      addInventory(citizen.inventory, { [item]: received });
+      if (composed)
+        recordDelivery(world, citizen, { item, quantity: received, source: 'harvest', settlementId: `harvest:${action.id}` });
+      else witnessHarvest(world, citizen, deposit);
       break;
     }
     case 'craft':
       addInventory(citizen.inventory, { [itemKey(command.item, command.tier)]: 1 });
+      break;
+    case 'build-house': {
+      const health = BALANCE.buildingHealth[command.tier];
+      const houseId = id(world, 'house');
+      (world.houses ??= {})[houseId] = {
+        id: houseId,
+        ownerId: citizen.id,
+        tier: command.tier,
+        x: command.x,
+        y: command.y,
+        health,
+        maxHealth: health,
+      };
+      break;
+    }
+    case 'attack-sign': {
+      const sign = world.signs?.[command.signId];
+      if (!sign) break;
+      sign.health = Math.max(0, sign.health - 1);
+      const territory = world.territories?.[sign.territoryId];
+      const witnesses = territory ? memberWitnesses(world, territory, citizen.id, sign) : [];
+      for (const witness of witnesses)
+        witnessStructureAttack(world, citizen.id, witness.id, sign);
+      event(world, 'attack', `${citizen.name} attacked a territory sign at (${sign.x},${sign.y}); ${sign.health} health remains.`, {
+        citizenId: citizen.id,
+        targetId: sign.id,
+        x: sign.x,
+        y: sign.y,
+        audience: [citizen.id, ...witnesses.map((witness) => witness.id)],
+      });
+      if (sign.health <= 0) destroyTerritorySign(world, sign.id, citizen.id);
+      break;
+    }
+    case 'sleep':
+      if (citizen.rest) delete citizen.rest.sleepingHouseId;
       break;
     case 'build': {
       const buildingId = id(world, 'building');
@@ -673,7 +1189,21 @@ function advanceAction(world: World, citizen: Citizen): void {
   const action = citizen.action;
   if (!action) return;
   if (isLifeAction(action.command)) {
+    const engaged =
+      world.controllerMode === 'composed' &&
+      action.command.type === 'attack' &&
+      action.phase === 'work';
+    const targetId = action.command.type === 'attack' ? action.command.targetId : undefined;
     advanceLifeAction(world, citizen);
+    // Witness at the real adjacent engagement, never at remote command
+    // acceptance: either the action was already striking (this tick may land
+    // the killing blow and clear the action) or it just closed into range.
+    const stillEngaged =
+      citizen.action?.command.type === 'attack' &&
+      citizen.action.phase === 'work' &&
+      citizen.action.id === action.id;
+    if (world.controllerMode === 'composed' && citizen.alive && targetId && (engaged || stillEngaged))
+      witnessComposedEngagement(world, citizen, targetId);
     return;
   }
   // Detours can take a previously visible site out of sight. Keep the action's
@@ -684,7 +1214,7 @@ function advanceAction(world: World, citizen: Citizen): void {
     action.phase === 'travel' &&
     distance(citizen, action.command) > BALANCE.sightRadius;
   if (!hiddenBuildTravel) {
-    const validity = requirements(world, citizen, action.command);
+    const validity = requirements(world, citizen, action.command, true);
     if (!validity.ok) {
       failAction(world, citizen, validity);
       return;
@@ -712,6 +1242,9 @@ function advanceAction(world: World, citizen: Citizen): void {
     if (step) {
       citizen.x = step.x;
       citizen.y = step.y;
+      // Trespass is witnessed on the actual position change, at the mover's
+      // genuinely visible new tile; reputation.ts supplies the cooldown.
+      if (world.controllerMode === 'composed') witnessComposedTrespass(world, citizen);
     }
     if (action.path.length) return;
     if (action.command.type === 'move') {
@@ -731,6 +1264,18 @@ function advanceAction(world: World, citizen: Citizen): void {
     return;
   }
   action.elapsed++;
+  if (action.command.type === 'sleep') {
+    // Sleep settles on the requested rest level after the minimum duration, not
+    // on elapsed time alone; a vanished house fails the action's revalidation.
+    const rest = citizen.rest;
+    if (
+      rest &&
+      action.elapsed >= COMPOSED_BALANCE.sleepMinimumTicks &&
+      rest.value >= action.command.targetRest - COMPOSED_BALANCE.quantityEpsilon
+    )
+      finishAction(world, citizen);
+    return;
+  }
   if (action.elapsed >= action.duration) finishAction(world, citizen);
 }
 function startQueued(world: World, citizen: Citizen): void {
@@ -751,17 +1296,30 @@ function startQueued(world: World, citizen: Citizen): void {
   }
 }
 function sustain(world: World, citizen: Citizen): void {
+  if (world.controllerMode === 'composed' && citizen.rest) {
+    const sleeping = citizen.action?.command.type === 'sleep' && citizen.action.phase === 'work';
+    citizen.rest.value = sleeping
+      ? Math.min(COMPOSED_BALANCE.maxRest, citizen.rest.value + restRate(world, citizen, citizen.rest.sleepingHouseId))
+      : Math.max(0, citizen.rest.value - COMPOSED_BALANCE.restDrain);
+  }
   citizen.fullness = Math.max(0, citizen.fullness - BALANCE.fullnessDrain);
   // Inputs and market escrow are already removed from available inventory.
   for (const tier of TIERS) {
     const key = itemKey('food', tier),
-      restored = nutrition(tier);
+      restored = nutrition(tier),
+      portion = Math.min(1, citizen.inventory[key] ?? 0);
     if (
-      (citizen.inventory[key] ?? 0) > 0 &&
-      (BALANCE.maxFullness - citizen.fullness + 1e-9 >= restored || citizen.fullness <= 1e-9)
+      portion > 0 &&
+      (BALANCE.maxFullness - citizen.fullness + 1e-9 >= restored * portion || citizen.fullness <= 1e-9)
     ) {
-      takeInventory(citizen.inventory, { [key]: 1 });
-      citizen.fullness = Math.min(BALANCE.maxFullness, citizen.fullness + restored);
+      // Coherent fractional consumption: taxed food arrives as e.g. 0.85 of a
+      // unit, so a meal eats min(1, available) and grants exactly proportional
+      // nutrition. Nutrition is granted only after the debit succeeds — a failed
+      // takeInventory never feeds the body, so a partial unit cannot become
+      // infinitely many meals. The meal text stays parser-compatible with
+      // citizen/context.ts's `Ate T<n> food.` pattern.
+      if (!takeInventory(citizen.inventory, { [key]: portion })) continue;
+      citizen.fullness = Math.min(BALANCE.maxFullness, citizen.fullness + restored * portion);
       event(world, 'meal', `Ate T${tier} food.`, { citizenId: citizen.id, audience: [citizen.id] });
       break;
     }
@@ -774,7 +1332,8 @@ function sustain(world: World, citizen: Citizen): void {
   if (citizen.health <= 0) settleDeath(world, citizen.id);
 }
 
-/** Tick order: regrowth, physical actions, meals/starvation, queue/plan advancement.
+/** Harvest ties settle in citizen insertion order (Object.values); first completion wins.
+ * Tick order: regrowth, physical actions, meals/starvation, queue/plan advancement.
  * Commands and ticks are synchronous; the runtime owns scheduling/generations. */
 export function tickWorld(world: World, count = 1, options?: WorldControlOptions): void {
   if (!Number.isSafeInteger(count) || count < 0)
@@ -787,6 +1346,7 @@ export function tickWorld(world: World, count = 1, options?: WorldControlOptions
     const existingCitizens = options?.authority ? new Set(Object.keys(world.citizens)) : undefined;
     world.tick++;
     maintainSociety(world);
+    if (world.controllerMode === 'composed') maintainTerritories(world);
     for (const deposit of Object.values(world.deposits)) {
       if (
         deposit.stock < deposit.capacity &&
@@ -801,6 +1361,26 @@ export function tickWorld(world: World, count = 1, options?: WorldControlOptions
       if (!citizen.alive) continue;
       if (citizen.health <= 0) {
         settleDeath(world, citizen.id);
+        continue;
+      }
+      if (world.controllerMode === 'composed') {
+        // Composed citizens route to the statically imported tree controller
+        // (src/world/tree-controller.ts); no legacy emergency, autonomy, plan or
+        // directive may issue competing commands. Bodies still work, eat, rest
+        // and start already-queued physical work. The same evaluation authority
+        // that gates legacy strategy gates composed tree decisions, so passive
+        // bodies are an explicit authority choice, never silent inertness: with
+        // no authority metadata (the default) every composed citizen runs the
+        // tree controller from the very first tick.
+        const composedStrategic = strategyAllowed(citizen.id, options);
+        ensureComposedBody(world, citizen);
+        advanceAction(world, citizen);
+        if (!citizen.alive) continue;
+        sustain(world, citizen);
+        if (citizen.alive && citizen.health > 0) {
+          startQueued(world, citizen);
+          if (composedStrategic) advanceTree(world, citizen);
+        }
         continue;
       }
       const strategic = strategyAllowed(citizen.id, options);

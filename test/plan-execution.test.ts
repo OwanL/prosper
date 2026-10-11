@@ -88,7 +88,7 @@ describe('approved durable plans', () => {
   it('uses the citizen-selected food condition to leave work and advance to its next step', () => {
     const { citizen, approve, tick } = setup();
     citizen.inventory = {};
-    citizen.fullness = 3;
+    citizen.fullness = 30 * BALANCE.fullnessDrain;
     approve({
       mode: 'append',
       steps: [

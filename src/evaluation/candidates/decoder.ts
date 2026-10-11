@@ -1,39 +1,13 @@
 import { z } from 'zod';
-import { MAX_TIER, TRADABLE_ITEM_RE } from '../../shared/tiers.ts';
-import { BALANCE } from '../../world/config.ts';
+import { commandSchema } from '../../citizen/tools.ts';
 import type { Command } from '../../shared/types.ts';
 import type { PrimitiveDecision } from '../contracts.ts';
 
-// Same public primitive surface and bounds as citizen/tools.ts. No strategy,
-// query, evaluator access, semantic repair or execution is available here.
+// Reuse only the public primitive command grammar, not strategy/query tools or
+// checkpoint restore types. This also retains runtime refinements (whole tools,
+// safe order totals) that JSON Schema cannot express.
 const id = z.string().min(1).max(200);
-const coordinate = z.number().int().min(0);
-const tier = z.number().int().min(1).max(MAX_TIER);
-const toolKind = z.enum(['axe', 'scythe', 'knife', 'sword']);
-const building = z.enum(['lumbermill', 'spinning-wheel', 'butchery', 'wall']);
-const item = z.string().regex(TRADABLE_ITEM_RE);
-const positive = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
-const variant = <T extends z.ZodRawShape>(type: string, shape: T) =>
-  z.object({ type: z.literal(type), ...shape, queue: z.enum(['replace', 'append']).optional() }).strict();
-export const primitiveCommandSchema = z.union([
-  variant('move', { x: coordinate, y: coordinate }),
-  variant('harvest', { depositId: id }),
-  variant('craft', { item: toolKind, tier }),
-  variant('build', { kind: building, tier, x: coordinate, y: coordinate }),
-  variant('refine', { buildingId: id, fromTier: tier, direction: z.enum(['up', 'down']).optional() }),
-  variant('attack', { targetId: id }),
-  variant('loot', { lootId: id }),
-  variant('cancel', {}),
-  variant('order', { side: z.enum(['buy', 'sell']), item, quantity: positive, price: positive }),
-  variant('cancel-order', { orderId: id }),
-  variant('transfer', { citizenId: id, gold: positive }),
-  variant('give', { citizenId: id, item, quantity: positive }),
-  variant('message', { text: z.string().min(1).max(BALANCE.messageLength), to: id.optional() }),
-  variant('remember', { text: z.string().min(1).max(BALANCE.memoryLength) }),
-  variant('goals', { goals: z.array(z.string().min(1).max(BALANCE.goalLength)).max(BALANCE.goalLimit) }),
-  variant('reproduce', { partnerId: id }),
-  variant('consent', { partnerId: id, accept: z.boolean() }),
-]);
+export const primitiveCommandSchema = commandSchema;
 export const primitiveDecisionSchema = z.union([
   z.object({ requestId: id, kind: z.literal('advance') }).strict(),
   z.object({ requestId: id, kind: z.literal('command'), command: primitiveCommandSchema }).strict(),

@@ -58,7 +58,13 @@ test('population control creates a hundred autonomous citizens without changing 
   page.once('dialog', (dialog) => dialog.accept());
   const after = await clickControl(page, 'Reset world');
   expect(Object.keys(after.world.citizens)).toHaveLength(100);
-  expect(Object.values(after.world.citizens).every((citizen) => !!citizen.autonomy)).toBe(true);
+  expect(after.world.controllerMode).toBe('composed');
+  for (const citizen of Object.values(after.world.citizens)) {
+    expect(citizen.alive).toBe(true);
+    expect(citizen.mind).toBeDefined();
+    expect(citizen.rest).toBeDefined();
+    expect(citizen.autonomy).toBeUndefined();
+  }
   expect(after.budget.requests).toBe(before.budget.requests);
   expect(after.budget.tokens).toBe(before.budget.tokens);
   expect(after.budget.limit).toBe(before.budget.limit);

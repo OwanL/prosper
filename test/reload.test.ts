@@ -87,6 +87,7 @@ describe('versioned consistent reload', () => {
     const old = runtime({
       directory: root,
       autoClock: false,
+      legacy: true,
       runner: {
         transport: async () =>
           ++requests === 1
@@ -218,7 +219,8 @@ describe('versioned consistent reload', () => {
   });
   it('round trips joint reproduction IDs, per-parent reservations and full physical queues', () => {
     const root = directory();
-    const old = runtime({ directory: root, autoClock: false });
+    // Legacy body-mechanics fixture: joint reproduction/queue continuity predates composed minds.
+    const old = runtime({ directory: root, autoClock: false, legacy: true });
     const [a, b] = Object.values(old.world.citizens);
     b.x = a.x;
     b.y = a.y;
@@ -242,7 +244,7 @@ describe('versioned consistent reload', () => {
   });
   it('persists remaining recorded fixtures rather than replaying committed fixture commands', async () => {
     const root = directory();
-    const old = runtime({ directory: root, autoClock: false });
+    const old = runtime({ directory: root, autoClock: false, legacy: true });
     const citizenId = Object.keys(old.world.citizens)[0];
     old.importFixtures([
       {

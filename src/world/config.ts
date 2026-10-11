@@ -6,7 +6,7 @@ const tierTable = (value: (tier: number) => number): Record<number, number> =>
   Object.fromEntries(TIERS.map((tier) => [tier, value(tier)]));
 
 // One tick is simulation time, never wall-clock time. Without food, fullness lasts
-// 1,000 ticks and starvation takes another 500: ample time for travel and gathering.
+// 2,000 ticks and starvation takes another 500: ample time for travel and gathering.
 export const BALANCE = {
   // Keep each additional band traversable and the central sectors large enough.
   width: 6 * RING_COUNT + 1,
@@ -16,7 +16,7 @@ export const BALANCE = {
   startingFood: 3,
   maxHealth: 100,
   maxFullness: 100,
-  fullnessDrain: 0.1,
+  fullnessDrain: 0.05,
   starvationDamage: 0.2,
   healing: 0.05,
   moveTicks: 2,
@@ -37,8 +37,8 @@ export const BALANCE = {
   lootTicks: 4,
   salvageFraction: 0.75,
   // Each parent pays 100 potential fullness; the child starts with only 60.
-  reproductionFoodTier: 2,
-  reproductionFood: 3,
+  reproductionFoodTier: 1,
+  reproductionFood: 1,
   reproductionHealth: 75,
   reproductionTicks: 24,
   reproductionCooldown: 1_000,
@@ -55,6 +55,19 @@ export const BALANCE = {
   goalLimit: 8,
   goalLength: 200,
 } as const;
+
+/** Provisional composed-world balance; fractions are finite JS numbers with 1e-9 conservation tolerance. */
+export const COMPOSED_BALANCE = {
+  quantityEpsilon: 1e-9, territoryWoodPerTile: 2, territoryTaxRate: 0.15,
+  signHealth: 16, signAttackTicks: 8, signRecoveryFraction: 0.5,
+  admissionTimeoutTicks: 120, offenseCooldownTicks: 120, maxTerritoryTilesPerCommand: 64,
+  directorIntervalTicks: 2400, maxRest: 100, restDrain: 0.1,
+  fatigueThreshold: 20, fatigueDurationMultiplier: 1.5, outdoorRestPerTick: 2,
+  houseRestPerTick: 4, sleepMinimumTicks: 8,
+} as const;
+export function houseRecipe(tier: Tier): Inventory {
+  return { [itemKey('wood', tier)]: 2 * 2 ** (tier - 1), [itemKey('fibre', tier)]: 2 ** (tier - 1) };
+}
 
 export const RESOURCES: readonly Resource[] = ['wood', 'food', 'fibre'];
 /** Tool kinds are carried inventory items, automatically selected when used. */

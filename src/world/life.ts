@@ -4,6 +4,7 @@ import type {
   Citizen,
   Command,
   CommandResult,
+  House,
   Inventory,
   Point,
   World,
@@ -20,9 +21,11 @@ import {
   random,
   takeInventory,
 } from '../shared/utils.ts';
-import { BALANCE } from './config.ts';
+import { BALANCE, houseRecipe } from './config.ts';
 import { allocateCitizenName } from './names.ts';
+import { ensureComposedBody } from './core.ts';
 import { cancelBuildingOrders, cancelCitizenOrders } from './market.ts';
+import { witnessTerritoryTrespass } from './reputation.ts';
 import { findPath, neighbors, walkable } from './pathfinding.ts';
 import { discardPlan, planActionResult } from './plans.ts';
 import {
@@ -33,6 +36,7 @@ import {
 import { cancelEmergency } from './emergency.ts';
 import { inheritAutonomy } from './autonomy.ts';
 import { highestToolTier } from '../shared/tool-utils.ts';
+import { inheritTerritoryMembership, settleTerritoryDeath, territoryAt } from './territory.ts';
 
 export const isLifeAction = (command: Command) =>
   ['attack', 'loot', 'reproduce'].includes(command.type);
@@ -45,8 +49,8 @@ const living = (citizen: Citizen | undefined): citizen is Citizen =>
 const foodCost = (): Inventory => ({
   [itemKey('food', BALANCE.reproductionFoodTier)]: BALANCE.reproductionFood,
 });
-function attackTarget(world: World, targetId: string): Citizen | Building | undefined {
-  return world.citizens[targetId] ?? world.buildings[targetId];
+function attackTarget(world: World, targetId: string): Citizen | Building | House | undefined {
+  return world.citizens[targetId] ?? world.buildings[targetId] ?? world.houses?.[targetId];
 }
 
 function feedback(world: World, citizen: Citizen, result: CommandResult): CommandResult {
@@ -102,6 +106,63 @@ export function releaseAction(world: World, citizenId: string, clearQueue = true
   }
 }
 
+/** Family excludes reproduction partners; parents, children and half-siblings qualify. */
+function estateRecipients(world: World, dead: Citizen, killer?: Citizen): Citizen[] {
+  const survivors = Object.values(world.citizens)
+    .filter((c) => c.id !== dead.id && living(c))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  if (living(killer) && killer.id !== dead.id) return [killer];
+  const family = survivors.filter((c) => dead.parents?.includes(c.id) ||
+    c.parents?.includes(dead.id) || c.parents?.some((p) => dead.parents?.includes(p)));
+  if (family.length) return family;
+  const territory = Object.values(world.territories ?? {}).find((t) => t.members[dead.id]);
+  const members = survivors.filter((c) => territory?.members[c.id]);
+  return members.length ? members : survivors;
+}
+
+function distributeEstate(world: World, dead: Citizen, recipients: Citizen[]): void {
+  // With no survivors retain custody on the dead citizen, never destroy permanent tools.
+  if (!recipients.length) return;
+  let cursor = 0;
+  const share = (amount: number, give: (recipient: Citizen, amount: number) => void) => {
+    const base = Math.floor(amount / recipients.length);
+    for (const recipient of recipients) give(recipient, base);
+    const remainder = amount - base * recipients.length;
+    for (let i = 0; i < Math.floor(remainder); i++) give(recipients[cursor++ % recipients.length], 1);
+    if (remainder % 1) give(recipients[cursor++ % recipients.length], remainder % 1);
+  };
+  share(dead.gold, (recipient, amount) => { recipient.gold += amount; });
+  for (const [key, amount] of Object.entries(dead.inventory).sort(([a], [b]) => a.localeCompare(b)))
+    share(amount, (recipient, quantity) => addInventory(recipient.inventory, { [key]: quantity }));
+  const properties = [...Object.values(world.buildings), ...Object.values(world.houses ?? {})]
+    .filter((b) => b.ownerId === dead.id).sort((a, b) => a.id.localeCompare(b.id));
+  for (const property of properties) property.ownerId = recipients[cursor++ % recipients.length].id;
+  dead.gold = 0;
+  dead.inventory = {};
+}
+
+/** Houses are separate records: their destruction is recorded like building
+ * demolition, and construction salvage mirrors building salvage (fraction of
+ * the tier recipe, awarded once). Sleepers revalidate their own house. */
+function destroyHouse(world: World, house: House, attacker: Citizen): void {
+  delete world.houses![house.id];
+  addInventory(
+    attacker.inventory,
+    Object.fromEntries(
+      Object.entries(houseRecipe(house.tier)).map(([key, n]) => [
+        key,
+        Math.floor(n * BALANCE.salvageFraction),
+      ]),
+    ),
+  );
+  event(world, 'destruction', `Destroyed ${house.id}; construction salvage awarded once.`, {
+    citizenId: attacker.id,
+    targetId: house.id,
+    ...point(house),
+    audience: [attacker.id, house.ownerId],
+  });
+}
+
 /** Called for both attacks and starvation. Escrow and work return BEFORE holdings
  * move; alive=false and emptied holdings guard against duplicate settlement. */
 export function settleDeath(world: World, citizenId: string, killerId?: string): void {
@@ -114,10 +175,20 @@ export function settleDeath(world: World, citizenId: string, killerId?: string):
   citizen.health = 0;
   citizen.consent = {};
   for (const other of Object.values(world.citizens)) delete other.consent[citizenId];
-  for (const building of Object.values(world.buildings))
-    if (building.ownerId === citizenId) building.ownerId = null;
   const killer = killerId ? world.citizens[killerId] : undefined;
-  if (living(killer) && killer.id !== citizenId) {
+  const composed = world.controllerMode === 'composed';
+  if (composed) {
+    // Snapshot beneficiaries before territory succession removes the deceased's membership.
+    const recipients = estateRecipients(world, citizen, killer);
+    distributeEstate(world, citizen, recipients);
+    settleTerritoryDeath(world, citizen, living(killer) ? killer : undefined);
+  } else {
+    for (const building of Object.values(world.buildings))
+      if (building.ownerId === citizenId) building.ownerId = null;
+  }
+  if (composed) {
+    // Personal property has already settled independently of leadership eligibility.
+  } else if (living(killer) && killer.id !== citizenId) {
     killer.gold += citizen.gold;
     addInventory(killer.inventory, citizen.inventory);
   } else {
@@ -130,10 +201,13 @@ export function settleDeath(world: World, citizenId: string, killerId?: string):
       inventory: { ...citizen.inventory },
     };
   }
-  citizen.gold = 0;
-  citizen.inventory = {};
+  if (!composed) {
+    citizen.gold = 0;
+    citizen.inventory = {};
+  }
   citizen.lastResult = killer
     ? `Killed by ${killer.name}.`
+    : composed ? 'Died; estate settled to living beneficiaries or retained in custody.'
     : 'Died of starvation; holdings remain at the body.';
   event(world, 'death', citizen.lastResult, {
     citizenId,
@@ -183,10 +257,30 @@ export function consentCommand(world: World, citizen: Citizen, command: Command)
   if (command.type !== 'consent') return fail('unsupported-command', 'Not a consent command.');
   const partner = world.citizens[command.partnerId];
   if (!living(partner)) return fail('missing-partner', 'Consent requires another living citizen.');
-  if (command.accept) citizen.consent[partner.id] = world.tick + BALANCE.consentTicks;
-  else {
+  const previousExpiry = citizen.consent[partner.id];
+  // Renew only after half the lease has elapsed. Repeated controller calls must
+  // not silently extend authority or notify the partner every tick.
+  const offered = command.accept &&
+    !(previousExpiry > world.tick + Math.floor(BALANCE.consentTicks / 2));
+  if (offered) citizen.consent[partner.id] = world.tick + BALANCE.consentTicks;
+  if (!command.accept) {
     delete citizen.consent[partner.id];
     if (citizen.action?.partnerId === partner.id) releaseAction(world, citizen.id, false);
+  }
+  if (offered || (!command.accept && previousExpiry !== undefined)) {
+    event(world, 'command', command.accept
+      ? `${citizen.id} offered family consent to ${partner.id}.`
+      : `${citizen.id} withdrew family consent to ${partner.id}.`, {
+      citizenId: citizen.id,
+      targetId: partner.id,
+      audience: [citizen.id, partner.id],
+      familyInvitation: {
+        fromId: citizen.id,
+        toId: partner.id,
+        expiresTick: command.accept ? citizen.consent[partner.id] : previousExpiry,
+        status: command.accept ? 'offered' : 'withdrawn',
+      },
+    });
   }
   return ok(
     command.accept
@@ -204,11 +298,6 @@ function reproductionRequirements(
     return fail('missing-partner', 'Both parents must be alive.');
   if (distance(citizen, partner) > 1 || !walkable(world, citizen) || !walkable(world, partner))
     return fail('not-adjacent', 'Meet on the same or orthogonally adjacent walkable tiles first.');
-  if (!(citizen.consent[partner.id] > world.tick && partner.consent[citizen.id] > world.tick))
-    return fail(
-      'consent-required',
-      'Both parents must explicitly consent to each other; consent may have expired.',
-    );
   if (citizen.health < BALANCE.reproductionHealth || partner.health < BALANCE.reproductionHealth)
     return fail(
       'parent-health',
@@ -332,6 +421,8 @@ export function startLifeAction(
     path = combatRoute(world, citizen, target, !current);
     duration = BALANCE.attackTicks;
   } else if (command.type === 'loot') {
+    if (world.controllerMode === 'composed')
+      return fail('unsupported-command', 'Ground loot is not available in composed worlds.');
     const body = world.loot[command.lootId];
     if (!body) return fail('missing-loot', 'That body is gone or already collected.');
     // Body positions never move. Pickup still requires timed travel and work.
@@ -367,12 +458,30 @@ function travel(world: World, citizen: Citizen, action: Action, path: Point[]): 
     if (step && walkable(world, step) && distance(citizen, step) === 1) {
       citizen.x = step.x;
       citizen.y = step.y;
+      // Pursuit obeys the same territory rule as ordinary travel: a step into a
+      // foreign territory tile is sanctioned only when a living member can
+      // actually see the mover's new position; reputation.ts owns the cooldown
+      // that keeps repeated pursuit steps idempotent.
+      if (world.controllerMode === 'composed' && citizen.health > 0)
+        witnessPursuitTrespass(world, citizen);
     }
     action.elapsed = 0;
     if (!action.path.length) {
       action.phase = 'work';
       action.duration = action.command.type === 'attack' ? BALANCE.attackTicks : BALANCE.lootTicks;
     }
+  }
+}
+/** Every actually-visible territory member other than the mover; no omniscient
+ * reactions. Mirrors the core travel witness with real sight. */
+function witnessPursuitTrespass(world: World, mover: Citizen): void {
+  const territory = territoryAt(world, mover);
+  if (!territory || territory.members[mover.id]) return;
+  for (const memberId of Object.keys(territory.members)) {
+    if (memberId === mover.id) continue;
+    const member = world.citizens[memberId];
+    if (member?.alive && distance(member, mover) <= BALANCE.sightRadius)
+      witnessTerritoryTrespass(world, mover.id, member.id, mover);
   }
 }
 function destroyBuilding(world: World, building: Building, attacker: Citizen): void {
@@ -469,8 +578,10 @@ function advanceAttack(world: World, citizen: Citizen, action: Action, targetId:
     { citizenId: citizen.id, targetId, ...point(target), audience },
   );
   if (target.health <= 0) {
-    if (building) destroyBuilding(world, target, citizen);
-    else settleDeath(world, target.id, citizen.id);
+    if ('ownerId' in target) {
+      if ('kind' in target) destroyBuilding(world, target, citizen);
+      else destroyHouse(world, target, citizen);
+    } else settleDeath(world, target.id, citizen.id);
     planActionResult(citizen, action.id, ok(`Defeated ${targetId}.`));
     directiveActionResult(citizen, action.id, ok(`Defeated ${targetId}.`));
     citizen.action = null;
@@ -548,7 +659,10 @@ function advanceReproduction(world: World, citizen: Citizen, action: Action): vo
     consent: {},
     reproductionCooldown: 0,
   };
-  inheritAutonomy(world, world.citizens[childId], citizen, partner);
+  if (world.controllerMode === 'composed') {
+    ensureComposedBody(world, world.citizens[childId]);
+    inheritTerritoryMembership(world, world.citizens[childId], citizen, partner);
+  } else inheritAutonomy(world, world.citizens[childId], citizen, partner);
   feedback(world, citizen, ok(`Reproduction completed: ${childId}.`));
   feedback(world, partner, ok(`Reproduction completed: ${childId}.`));
   event(world, 'birth', `${childId} born to ${citizen.id} and ${partner.id}.`, {

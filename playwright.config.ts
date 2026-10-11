@@ -16,6 +16,8 @@ export default defineConfig({
     'navigation.spec.ts',
     'continuous-motion.spec.ts',
     'real-scene.spec.ts',
+    'territory-roster.spec.ts',
+    'observability.spec.ts',
   ],
   globalSetup: './test/browser/setup.ts',
   fullyParallel: false,

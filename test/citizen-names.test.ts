@@ -43,10 +43,8 @@ describe('local citizen name database', () => {
       parent.x = 1;
       parent.y = 1;
       parent.fullness = 100;
-      parent.inventory = { 'food:2': BALANCE.reproductionFood };
+      parent.inventory = { 'food:1': BALANCE.reproductionFood };
     }
-    expect(dispatch(world, a.id, { type: 'consent', partnerId: b.id, accept: true }).ok).toBe(true);
-    expect(dispatch(world, b.id, { type: 'consent', partnerId: a.id, accept: true }).ok).toBe(true);
     const expectedName = allocateCitizenName(world.citizens);
     const savedNames = Object.values(world.citizens).map((citizen) => citizen.name);
     expect(dispatch(world, a.id, { type: 'reproduce', partnerId: b.id }).ok).toBe(true);

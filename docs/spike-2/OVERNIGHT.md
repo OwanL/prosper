@@ -9,6 +9,10 @@ The requested outcome is a watchable simulation of motivated, fallible citizens:
 - Tests and experiments use isolated temporary data or unique `.experiments/` directories. No reset, deletion or direct ledger edit was issued against existing durable runs. The user's dev supervisor was already listening on 5173/4310/4312 since 17:21; it remains running and may indirectly checkpoint/restart in response to source edits. No before/after hash claim is made for durable directories.
 - Existing runner reserves 40,000 output tokens, permits four requests per turn, sends a lengthy manual and a duplicative map, and wakes on individual messages/trades/errors. Prior audited runs contain no attack attempts despite extensive aggression prose. Reproduction consent expires during ordinary travel/inference. These are concrete structural failures to address.
 
+## Historical scope and current reproduction rule
+
+This document records the October 7–8 implementation and evidence. Its consent/negotiated-family descriptions are superseded by the October 11 rule: adjacent mechanically eligible parents each reserve one T1 food; no consent or rendezvous is required. Restored historical joint 3-T2 commitments retain their original costs and refunds. Other historical results below are not rerun claims.
+
 ## Working design and acceptance
 
 1. **Body:** synchronous authoritative game actions and accounting; pathfinding, reservations, combat, consent and settlement stay deterministic.

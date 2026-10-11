@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_TIER, TIERS } from '../src/shared/tiers.ts';
-import type { Action, Citizen, Command, World } from '../src/shared/types.ts';
+import type { Action, Citizen, Command, Order, World } from '../src/shared/types.ts';
 import {
   cancelBuildingOrders,
   cancelCitizenOrders,
@@ -176,59 +176,93 @@ describe('market escrow and settlement', () => {
   });
 });
 
-describe('unique building assets', () => {
-  it('reserves ownership without removing the map building and sells remotely once', () => {
+// Migrated meaning: market building trading is deliberately removed. Orders against
+// `building:<id>` keys are rejected outright ('building-trading-disabled'); buildings stay
+// on the map under their owner, ownership never transfers through the market, and
+// pre-existing listing/order state from historical checkpoints is compatibility data that
+// legacy cleanup ('cancelLegacyBuildingOrders' on any market command, 'cancelBuildingOrders'
+// on destruction) cancels with full refunds. Live ownership revalidation for refining is
+// tested in core.test.ts via explicit fixture ownership mutation.
+describe('building orders rejected', () => {
+  const legacyOrder = (
+    id: string,
+    citizenId: string,
+    side: 'buy' | 'sell',
+    escrowGold: number,
+    escrowItems: Order['escrowItems'],
+  ): Order => ({
+    id,
+    citizenId,
+    side,
+    item: 'building:mill',
+    quantity: 1,
+    price: 50,
+    createdTick: 0,
+    sequence: 1,
+    escrowGold,
+    escrowItems,
+  });
+  it('rejects building orders without removing the map building or moving gold', () => {
     const w = fixture();
     building(w);
-    expect(place(w, 'a', 'sell', 1, 40, 'building:mill').ok).toBe(true);
-    expect(isBuildingListed(w, 'mill')).toBe(true);
-    expect(w.buildings.mill.ownerId).toBe('a');
-    expect(place(w, 'a', 'sell', 1, 30, 'building:mill').ok).toBe(false);
-    expect(place(w, 'b', 'buy', 1, 50, 'building:mill').ok).toBe(true);
-    expect(w.buildings.mill).toMatchObject({ ownerId: 'b', x: 5, y: 5 });
-    expect(w.citizens.b.gold).toBe(60);
-    expect(w.citizens.a.gold).toBe(140);
+    expect(place(w, 'a', 'sell', 1, 40, 'building:mill').code).toBe('building-trading-disabled');
+    expect(place(w, 'b', 'buy', 1, 50, 'building:mill').code).toBe('building-trading-disabled');
     expect(isBuildingListed(w, 'mill')).toBe(false);
+    expect(w.buildings.mill).toMatchObject({ ownerId: 'a', x: 5, y: 5 });
+    expect(w.orders).toEqual({});
+    expect(w.citizens.a.gold).toBe(100);
+    expect(w.citizens.b.gold).toBe(100);
     expect(gold(w)).toBe(300);
-    expect(place(w, 'a', 'sell', 1, 30, 'building:mill').ok).toBe(false);
   });
-  it('rejects active processing and nonunique quantities', () => {
+  it('rejects building orders during active refining and at any quantity', () => {
     const w = fixture();
     building(w);
     refine(w);
-    expect(place(w, 'a', 'sell', 1, 40, 'building:mill').ok).toBe(false);
+    expect(place(w, 'a', 'sell', 1, 40, 'building:mill').code).toBe('building-trading-disabled');
+    expect(place(w, 'a', 'sell', 2, 40, 'building:mill').code).toBe('building-trading-disabled');
+    // Physical work reservations are untouched by the rejections.
+    expect(w.citizens.a.action?.reserved).toEqual({ 'wood:1': 3 });
     w.citizens.a.action = null;
-    expect(place(w, 'a', 'sell', 2, 40, 'building:mill').ok).toBe(false);
+    expect(place(w, 'a', 'buy', 1, 40, 'building:mill').code).toBe('building-trading-disabled');
+    expect(w.orders).toEqual({});
+    expect(gold(w)).toBe(300);
   });
-  it('cancels sell and buy listings on destruction without creating a carried building', () => {
+  it('cancels legacy orders on destruction without creating a carried building', () => {
     const w = fixture();
     building(w);
-    place(w, 'a', 'sell', 1, 80, 'building:mill');
-    place(w, 'b', 'buy', 1, 40, 'building:mill');
+    // Historical checkpoint data: real escrow already taken from both citizens.
+    w.orders['legacy-sell'] = legacyOrder('legacy-sell', 'a', 'sell', 80, {});
+    w.orders['legacy-buy'] = legacyOrder('legacy-buy', 'b', 'buy', 40, {});
+    w.citizens.a.gold = 100 - 80;
+    w.citizens.b.gold = 100 - 40;
     delete w.buildings.mill;
     cancelBuildingOrders(w, 'mill');
     cancelBuildingOrders(w, 'mill');
     expect(w.orders).toEqual({});
+    expect(w.citizens.a.gold).toBe(100);
     expect(w.citizens.b.gold).toBe(100);
     expect(w.citizens.a.inventory).toEqual({});
+    expect(w.citizens.b.inventory).toEqual({});
     expect(gold(w)).toBe(300);
   });
   it.each(['owner', 'health', 'existence'] as const)(
-    'rechecks %s before settlement',
+    'cancels legacy listings with refunds rather than settling when stale on %s',
     (condition) => {
       const w = fixture();
       building(w);
-      place(w, 'a', 'sell', 1, 30, 'building:mill');
+      // Historical checkpoint listing with real escrow from 'a' (compatibility data only).
+      w.orders['legacy'] = legacyOrder('legacy', 'a', 'sell', 30, {});
+      w.citizens.a.gold = 100 - 30;
+      // Separate refine-revalidation scenarios mutate ownership explicitly (core.test.ts);
+      // here the mutation only proves the listing is never settled against a stale state.
       if (condition === 'owner') w.buildings.mill.ownerId = 'c';
       else if (condition === 'health') w.buildings.mill.health = 0;
       else delete w.buildings.mill;
-      const result = place(w, 'b', 'buy', 1, 40, 'building:mill');
-      if (condition === 'owner') {
-        expect(result.ok).toBe(true);
-        expect(w.buildings.mill.ownerId).toBe('c');
-        expect(Object.values(w.orders).every((o) => o.side === 'buy')).toBe(true);
-      } else expect(result.ok).toBe(false);
+      // Any market command clears legacy building orders with refunds before matching.
+      expect(place(w, 'b', 'buy', 1, 40, 'wood:1').ok).toBe(true);
+      expect(w.orders['legacy']).toBeUndefined();
       expect(w.citizens.a.gold).toBe(100);
+      expect(Object.values(w.orders).every((o) => o.item === 'wood:1')).toBe(true);
       expect(gold(w)).toBe(300);
     },
   );
@@ -253,7 +287,11 @@ describe('validation and available holdings', () => {
     expect(place(w, 'a', 'sell', 1, 1).ok).toBe(true);
     expect(w.citizens.a.action?.reserved).toEqual({ 'wood:1': 3 });
   });
-  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+  // Migrated meaning: fractional commodity quantities (e.g. 1.5 wood) are now valid order
+  // quantities; equipment/tools must remain discrete whole copies. Fractional prices stay
+  // invalid. Zero/negative/non-finite/overflow quantities and prices remain invalid without
+  // mutation for every item class.
+  it.each([0, -1, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
     'rejects invalid price and quantity %s without mutation',
     (n) => {
       const w = fixture();
@@ -263,6 +301,23 @@ describe('validation and available holdings', () => {
       expect(JSON.stringify(w)).toBe(before);
     },
   );
+  it('accepts fractional commodity quantities but requires whole tool copies and prices', () => {
+    const w = fixture();
+    const before = JSON.stringify(w);
+    // Tools must be discrete.
+    expect(place(w, 'a', 'buy', 1.5, 1, 'axe:1').code).toBe('invalid-order');
+    expect(JSON.stringify(w)).toBe(before);
+    // Fractional commodity quantity is valid and escrows fractional total gold.
+    expect(place(w, 'a', 'buy', 1.5, 2, 'wood:1').ok).toBe(true);
+    const order = Object.values(w.orders)[0];
+    expect(order.quantity).toBe(1.5);
+    expect(order.escrowGold).toBe(3);
+    const after = JSON.stringify(w);
+    // Fractional prices remain invalid without mutation.
+    expect(place(w, 'b', 'buy', 1, 1.5, 'wood:1').code).toBe('invalid-order');
+    expect(JSON.stringify(w)).toBe(after);
+    expect(gold(w)).toBe(300);
+  });
   it.each(TIERS)('trades and refunds carried items at tier %i', (tier) => {
     const w = fixture();
     for (const kind of ['wood', 'food', 'fibre', 'axe', 'scythe', 'knife', 'sword']) {

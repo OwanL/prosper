@@ -14,7 +14,8 @@ export function marketReserves(citizen:Citizen):Record<string,number> {
     for(const tier of TIERS)if(tier<=goal.tier)for(const kind of ['axe','knife','scythe'] as const)if(highestToolTier(citizen,kind)<tier)protect(equipmentRecipe(kind,tier));
   }
   if(state.project)protect(buildingRecipe(state.project.kind,state.project.tier));
-  if(policy.reproduction!=='avoid')result['food:2']=Math.max(result['food:2']??0,BALANCE.reproductionFood+1);
+  // Family inputs use the same T1 food as ordinary meals.
+  if(policy.reproduction!=='avoid')result['food:1']=Math.max(result['food:1']??0,BALANCE.reproductionFood+1);
   // Livelihood preference protects one best carried tool, never prohibits explicit sales.
   const best=highestToolTier(citizen,tool);
   if(best)result[`${tool}:${best}`]=Math.max(result[`${tool}:${best}`]??0,1);

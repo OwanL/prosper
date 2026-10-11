@@ -5,7 +5,7 @@ import { enableAutonomy, foodRunway } from '../src/world/autonomy.ts';
 import { beginEmergency } from '../src/world/emergency.ts';
 import { approvePlan, conditionMet } from '../src/world/plans.ts';
 import { updateKnowledge } from '../src/world/observation.ts';
-import { nutrition } from '../src/world/config.ts';
+import { BALANCE, nutrition } from '../src/world/config.ts';
 
 function fixture(resource: 'wood' | 'food' = 'wood') {
   const world = createWorld({ seed: 42, population: 2 });
@@ -34,7 +34,7 @@ describe('dynamic world tier consumers', () => {
     enableAutonomy(world, citizen);
     expect(citizen.autonomy!.policy.targetTier).toBe(MAX_TIER);
     citizen.inventory['food:7'] = 2;
-    const ticks = (citizen.fullness + 2 * nutrition(7)) / .1;
+    const ticks = (citizen.fullness + 2 * nutrition(7)) / BALANCE.fullnessDrain;
     expect(foodRunway(citizen)).toBe(ticks);
     expect(conditionMet(citizen, { kind: 'food-runway-below', ticks: ticks - 1 })).toBe(false);
     expect(conditionMet(citizen, { kind: 'food-runway-below', ticks: ticks + 1 })).toBe(true);

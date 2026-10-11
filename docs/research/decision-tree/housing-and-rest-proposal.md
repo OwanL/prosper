@@ -1,7 +1,11 @@
 # Housing and rest — recorded proposal
 
 Date: 2026-10-09
-Status: future mechanic proposal; `CanBuildHouse` / `BuildHouse` and `CanSleep` / `Sleep` responsibilities approved on 2026-10-10. Houses and rest are not implemented; this note does not authorize runtime changes.
+Status: original proposal retained for provenance; responsibilities approved on 2026-10-10 and subsequent user authorization implemented houses/rest in composed worlds on 2026-10-11. The future/unsettled wording below describes the original proposal, not current feature absence.
+
+Current implementation: `src/world/core.ts` and `config.ts` own physical rest/sleep/house rules; `src/citizen/tree-actions.ts` implements the guard/action pairs and `tree-spatial.ts` ranks sites. Provisional defaults: rest max 100, awake drain 0.1/tick, fatigue threshold 20, duration multiplier 1.5, outdoor recovery 2/tick, house base recovery 4/tick and minimum sleep 8 ticks. House exact-tier recipe costs `2 × 2^(tier-1)` wood and `2^(tier-1)` fibre. Access uses ownership or active territory shared use; estate settlement is separate from trade. Source is authoritative for activity/tier details.
+
+`test/composed-engine.test.ts` and `composed-tree-actions.test.ts` cover mechanics/execution; the [bounded evaluation](composed-evaluation.md) observes actual houses and sleep, not optimized residence or commute economics. Balancing location, tier investment and interruption remains provisional. Legacy checkpoints are preserved, not automatically given composed mechanics; see [implementation checkpoint](composed-implementation.md).
 
 ## Approved building pair
 

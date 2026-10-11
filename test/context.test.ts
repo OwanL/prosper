@@ -101,6 +101,28 @@ describe('provider-only context compaction', () => {
     expect(projected.rememberedFormat).toContain('not live facts');
   });
 
+  it('preserves dated territory evidence while keeping omitted and known-absent distinct', () => {
+    const observation = setup();
+    const unknown = tile(1, 2);
+    const absent = { ...tile(2, 3), observedTerritoryId: null };
+    const owned = { ...tile(3, 4), observedTerritoryId: 'territory-owner' };
+    observation.visible = [unknown, absent, owned];
+    observation.remembered = [unknown, absent, owned];
+
+    const projected = providerContext(observation);
+    expect(projected.visible).toEqual([
+      { x: 1, y: 1, seenTick: 2 },
+      { x: 2, y: 1, seenTick: 3, observedTerritoryId: null },
+      { x: 3, y: 1, seenTick: 4, observedTerritoryId: 'territory-owner' },
+    ]);
+    expect(projected.remembered).toEqual([]);
+    expect(projected.rememberedEmpty).toEqual([
+      [1, 1, 2],
+      [2, 1, 3, null],
+      [3, 1, 4, 'territory-owner'],
+    ]);
+  });
+
   it('losslessly omits empty arrays from current sightings without hiding observed walls or entities', () => {
     const observation = setup();
     observation.visible = [

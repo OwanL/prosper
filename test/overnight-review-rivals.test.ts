@@ -31,7 +31,7 @@ describe('overnight review: explicit rivalry', () => {
     expect(citizen.autonomy?.requestedPartnerId).toBeUndefined();
   });
 
-  it('drops a pending courtship when a newer policy names that partner as a rival', () => {
+  it('ignores historical family offers and clears pending courtship on a rival policy', () => {
     const world = createWorld({ seed: 29, population: 2 });
     const [citizen, rival] = Object.values(world.citizens);
     citizen.x = rival.x = 4;
@@ -50,7 +50,7 @@ describe('overnight review: explicit rivalry', () => {
     });
 
     tickWorld(world, 20);
-    expect(citizen.autonomy?.requestedPartnerId).toBe(rival.id);
+    expect(citizen.autonomy?.requestedPartnerId).toBeUndefined();
     expect(Object.values(world.citizens)).toHaveLength(2);
 
     setAutonomyPolicy(world, citizen, { rivals: [rival.id] });
@@ -60,7 +60,7 @@ describe('overnight review: explicit rivalry', () => {
     expect(Object.values(world.citizens)).toHaveLength(2);
   });
 
-  it('clears an explicit partner and territory, revoking consent and the active claim', () => {
+  it('clears an explicit partner and territory while retaining inert historical consent', () => {
     expect(strategicDecisionSchema.safeParse({
       policy: { partnerId: null, territory: null, home: null },
     }).success).toBe(true);
@@ -75,7 +75,7 @@ describe('overnight review: explicit rivalry', () => {
       home: { x: 4, y: 4 },
     });
     relationship(citizen, partner.id).trust = 30;
-    expect(dispatch(world, citizen.id, { type: 'consent', partnerId: partner.id, accept: true }).ok).toBe(true);
+    citizen.consent[partner.id] = world.tick + 100; // retained historical record
     citizen.autonomy!.requestedPartnerId = partner.id;
     citizen.autonomy!.meeting = { partnerId: partner.id, x: 4, y: 4, tick: world.tick };
 
@@ -84,7 +84,7 @@ describe('overnight review: explicit rivalry', () => {
     expect(citizen.autonomy!.policy.partnerId).toBeUndefined();
     expect(citizen.autonomy!.policy.territory).toBeUndefined();
     expect(citizen.autonomy!.policy.home).toBeUndefined();
-    expect(citizen.consent[partner.id]).toBeUndefined();
+    expect(citizen.consent[partner.id]).toBe(100);
     expect(citizen.autonomy!.requestedPartnerId).toBeUndefined();
     expect(citizen.autonomy!.meeting).toBeUndefined();
     expect(Object.values(world.claims ?? {}).some((claim) => claim.ownerId === citizen.id)).toBe(false);

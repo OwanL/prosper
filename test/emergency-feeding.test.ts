@@ -196,7 +196,7 @@ describe('starvation-only emergency feeding', () => {
     expect(citizen.strategy).toBeUndefined();
   });
 
-  it('keeps parked harvest and construction claims unavailable to competitors', () => {
+  it('lets a competitor complete before parked harvesting resumes without duplicate yield', () => {
     const { world, citizen } = fixture();
     citizen.fullness = 50;
     dispatch(world, citizen.id, { type: 'harvest', depositId: 'wood' });
@@ -206,10 +206,26 @@ describe('starvation-only emergency feeding', () => {
     const other = Object.values(world.citizens)[1];
     other.x = 2;
     other.y = 2;
-    expect(dispatch(world, other.id, { type: 'harvest', depositId: 'wood' }).code).toBe(
-      'depleted-deposit',
-    );
-    cancelAction(world, citizen.id);
+    other.fullness = 100;
+    other.inventory = {};
+    expect(dispatch(world, other.id, { type: 'harvest', depositId: 'wood' }).ok).toBe(true);
+    expect(world.deposits.wood.stock).toBe(1);
+    tickWorld(world, BALANCE.harvestTicks);
+    expect(other.inventory['wood:1']).toBe(1);
+    expect(world.deposits.wood.stock).toBe(0);
+    for (let n = 0; n < emergencyTripDeadline(world, citizen) && citizen.emergency; n++) tickWorld(world);
+    expect(citizen.emergency).toBeUndefined();
+    tickWorld(world, BALANCE.harvestTicks);
+    expect(citizen.inventory['wood:1'] ?? 0).toBe(0);
+    expect(citizen.lastResult).toContain('depleted');
+    expect(citizen.action).toBeNull();
+  });
+
+  it('keeps parked construction claims exclusive', () => {
+    const { world, citizen } = fixture();
+    const other = Object.values(world.citizens)[1];
+    other.x = 2;
+    other.y = 2;
     citizen.fullness = 50;
     citizen.inventory = { 'wood:1': 30, 'fibre:1': 30, 'food:1': 30 };
     expect(
@@ -263,10 +279,8 @@ describe('starvation-only emergency feeding', () => {
     const partner = Object.values(world.citizens)[1];
     partner.x = 2;
     partner.y = 2;
-    citizen.inventory = { 'food:2': 3 };
-    partner.inventory = { 'food:2': 3 };
-    dispatch(world, citizen.id, { type: 'consent', partnerId: partner.id, accept: true });
-    dispatch(world, partner.id, { type: 'consent', partnerId: citizen.id, accept: true });
+    citizen.inventory = { 'food:1': 1 };
+    partner.inventory = { 'food:1': 1 };
     expect(dispatch(world, citizen.id, { type: 'reproduce', partnerId: partner.id }).ok).toBe(true);
     citizen.inventory = {};
     partner.inventory = {};

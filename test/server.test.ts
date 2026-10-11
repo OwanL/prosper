@@ -56,7 +56,9 @@ describe('native browser API', () => {
     });
     expect(result.status).toBe(200);
     expect(Object.keys(runtime.world.citizens)).toHaveLength(100);
-    expect(Object.values(runtime.world.citizens).every((citizen) => !!citizen.autonomy)).toBe(true);
+    // Composed Local AI world: no legacy autonomy bots, but every founder is a seeded composed body.
+    expect(runtime.world.controllerMode).toBe('composed');
+    expect(Object.values(runtime.world.citizens).every((citizen) => !!citizen.mind && !!citizen.rest)).toBe(true);
     expect(runtime.snapshot().budget.requests).toBe(0);
     expect((await post('/api/control', { type: 'play', population: 100 })).status).toBe(400);
     expect(
@@ -66,7 +68,7 @@ describe('native browser API', () => {
   });
   it('validates explicit total budget edits and retains caps and spending across paused restore/scenario', async () => {
     const transport = async () => ({ content: 'done', usage: { inputTokens: 5, outputTokens: 2 } });
-    const { root, runtime, post } = await setup({ runner: { transport } });
+    const { root, runtime, post } = await setup({ legacy: true, runner: { transport } });
     const initialRun = runtime.world.runId;
     const capped = await post('/api/budget', { maxRequests: 0, maxTokens: 100_000 });
     expect(capped).toMatchObject({
@@ -106,6 +108,8 @@ describe('native browser API', () => {
       directory: root,
       restore: true,
       autoClock: false,
+      // Legacy fixture runtime: scenario changes stay legacy so live mode remains available.
+      legacy: true,
       runner: {
         transport,
         minRequestIntervalMs: 0,
@@ -194,7 +198,7 @@ describe('native browser API', () => {
     ]);
   });
   it('loads named scenarios and imports fixtures only explicitly, never a live fallback', async () => {
-    const { get, post, runtime } = await setup();
+    const { get, post, runtime } = await setup({ legacy: true });
     expect((await get('/api/scenarios')).scenarios).toContain('progression');
     const oldRun = runtime.world.runId;
     const loaded = await post('/api/control', { type: 'scenario', scenario: 'progression' });

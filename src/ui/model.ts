@@ -3,9 +3,15 @@ import type {
   CitizenSighting,
   Deposit,
   Building,
+  House,
   Loot,
   Point,
+  Territory,
+  TerritorySign,
   World,
+  Citizen,
+  SpectatorCitizen,
+  SpectatorWorld,
   Command,
 } from '../shared/types';
 import type { Alliance, TerritorialClaim } from '../shared/autonomy-types';
@@ -19,6 +25,9 @@ export interface SceneCitizen extends CitizenSighting {
   fullness?: number;
   attackTargetId?: string;
   partnerId?: string;
+  resources?: Record<string, number>;
+  gold?: number;
+  territory?: { id: string; ownerId: string; label: string; color: string; role: 'owner' | 'member' };
 }
 export interface SceneEntity<T> {
   value: T;
@@ -33,15 +42,27 @@ export interface SceneModel {
   citizens: SceneEntity<SceneCitizen>[];
   deposits: SceneEntity<Deposit>[];
   buildings: SceneEntity<Building>[];
+  houses?: SceneEntity<House>[];
+  signs?: SceneEntity<TerritorySign>[];
+  territories?: Territory[];
   loot: SceneEntity<Pick<Loot, 'id' | 'x' | 'y' | 'citizenName'>>[];
   tiles: { x: number; y: number; seenTick: number; remembered: boolean }[] | null;
   claims?: TerritorialClaim[];
   alliances?: Alliance[];
 }
+/** Legacy presentation consumers do not read controller internals. Never treat a summary as CitizenMind. */
+export function withoutControllerSummary(citizen: Citizen | SpectatorCitizen): Citizen {
+  const { mind: _mind, ...body } = citizen;
+  return body;
+}
+export function presentationWorld(world: SpectatorWorld): World {
+  return { ...world, citizens: Object.fromEntries(Object.entries(world.citizens)
+    .map(([id, citizen]) => [id, withoutControllerSummary(citizen)])) };
+}
 export function progress(elapsed: number, duration: number): number {
   return duration > 0 ? Math.max(0, Math.min(1, elapsed / duration)) : 0;
 }
-export function projectWorld(world: World, thinking: string[] = []): SceneModel {
+export function projectWorld(world: World | SpectatorWorld, thinking: string[] = []): SceneModel {
   const wrap = <T>(value: T): SceneEntity<T> => ({
     value,
     remembered: false,
@@ -62,6 +83,8 @@ export function projectWorld(world: World, thinking: string[] = []): SceneModel 
       .map((c) =>
         wrap({
           ...c,
+          resources: { ...c.inventory },
+          territory: citizenTerritory(Object.values(world.territories ?? {}), c.id, world.citizens),
           activity: c.alive
             ? c.action
               ? c.action.phase === 'travel'
@@ -81,6 +104,9 @@ export function projectWorld(world: World, thinking: string[] = []): SceneModel 
       ),
     deposits: Object.values(world.deposits ?? {}).map(wrap),
     buildings: Object.values(world.buildings ?? {}).map(wrap),
+    houses: Object.values(world.houses ?? {}).map(wrap),
+    signs: Object.values(world.signs ?? {}).map(wrap),
+    territories: Object.values(world.territories ?? {}),
     loot: Object.values(world.loot ?? {}).map(wrap),
   };
 }
@@ -107,17 +133,84 @@ export function projectObservation(
         entities.set(value.id, { value, remembered: t.remembered, seenTick: t.seenTick });
     return [...entities.values()];
   };
+  // Signs and houses are not tile memories: dated evidence derives from the
+  // knowledge tiles the observation already exposes (no new server window).
+  const currentKeys = new Set((observation.visible ?? []).map((t) => `${t.x},${t.y}`));
+  const recalledTicks = new Map<string, number>(
+    (observation.remembered ?? []).map((t) => [`${t.x},${t.y}`, t.seenTick] as const),
+  );
+  const civic = <T extends Point>(list: T[] | undefined): SceneEntity<T>[] =>
+    (list ?? []).map((value) => {
+      const key = `${value.x},${value.y}`;
+      const remembered = !currentKeys.has(key) && recalledTicks.has(key);
+      return { value, remembered, seenTick: remembered ? recalledTicks.get(key)! : observation.tick };
+    });
   return {
     width: observation.mapSize?.width ?? dimensions.width,
     height: observation.mapSize?.height ?? dimensions.height,
     ringCount: observation.mapSize?.ringCount,
     tick: observation.tick,
     tiles,
-    citizens: collect((t) => t.citizens),
+    citizens: collect((t) => t.citizens).map((entity) => ({
+      ...entity,
+      value: {
+        ...entity.value,
+        gold: undefined,
+        resources: undefined,
+        territory: citizenTerritory(observation.territories ?? [], entity.value.id,
+          Object.fromEntries(tiles.flatMap(t => t.citizens).map(c => [c.id, c]))),
+        ...(entity.value.id === observation.citizen.id ? {
+          resources: { ...observation.citizen.inventory }, gold: observation.citizen.gold,
+        } : {}),
+      },
+    })),
     deposits: collect((t) => t.deposits),
     buildings: collect((t) => t.buildings),
+    houses: civic(observation.houses),
+    signs: civic(observation.signs),
+    territories: observation.territories,
     loot: collect((t) => t.loot),
   };
+}
+/** Tile membership is authoritative in signs; the map joins known signs to their territory. */
+export function markedTerritories(model: Pick<SceneModel, 'signs' | 'territories'>): Map<string, Territory> {
+  const byId = new Map((model.territories ?? []).map((territory) => [territory.id, territory]));
+  const marked = new Map<string, Territory>();
+  for (const { value: sign } of model.signs ?? []) {
+    const territory = byId.get(sign.territoryId);
+    if (territory) marked.set(`${sign.x},${sign.y}`, territory);
+  }
+  return marked;
+}
+/** Territory identity survives succession; personal identity colors remain untouched. */
+export function territoryColor(territory: Pick<Territory, 'id'>): string {
+  let hash = 2166136261;
+  for (const char of territory.id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return `hsl(${hash % 360} 58% 65%)`;
+}
+export const unaffiliatedColor = '#9ca3af';
+export function territoryLabel(territory: Pick<Territory, 'id' | 'ownerId'>,
+  citizens: Record<string, Pick<Citizen, 'name'>> = {}): string {
+  return `${citizens[territory.ownerId]?.name ?? 'Unknown owner'} · ${territory.id.slice(-8)}`;
+}
+export function citizenTerritory(territories: Territory[], citizenId: string,
+  citizens: Record<string, Pick<Citizen, 'name'>> = {}): SceneCitizen['territory'] {
+  const territory = [...territories].sort((a, b) => a.id.localeCompare(b.id))
+    .find((t) => !!t.members[citizenId]);
+  return territory ? { id: territory.id, ownerId: territory.ownerId,
+    label: territoryLabel(territory, citizens), color: territoryColor(territory),
+    role: territory.ownerId === citizenId ? 'owner' : 'member' } : undefined;
+}
+export function citizenColor(citizen: SceneCitizen): string {
+  return citizen.territory?.color ?? unaffiliatedColor;
+}
+export type TerritoryMembershipView = 'owner' | 'member' | 'none';
+export function membershipIn(
+  territory: Territory | undefined,
+  citizenId: string,
+): TerritoryMembershipView {
+  if (!territory?.members[citizenId]) return 'none';
+  return territory.ownerId === citizenId ? 'owner' : 'member';
 }
 export function occupantOffset(id: string, occupants: { id: string }[]): Point {
   const sorted = occupants.map((c) => c.id).sort();

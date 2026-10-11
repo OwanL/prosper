@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Citizen, Message, Point, WorldEvent } from '../shared/types';
+import type { Citizen, Message, Point, Territory, WorldEvent } from '../shared/types';
 import { Tooltip } from './Tooltip';
 import { claimAlliance, contestedOverlaps } from './Conflict';
 import { CitizenMotivation } from './Spectator';
@@ -12,6 +12,11 @@ import './navigation.css';
 import { clampZoom, panViewport, zoomViewport, type Viewport } from './navigation';
 import {
   cameraPoint,
+  citizenColor,
+  territoryColor,
+  territoryLabel,
+  markedTerritories,
+  membershipIn,
   occupantOffset,
   regionAt,
   screenPoint,
@@ -141,18 +146,8 @@ export function Scene({
           ? Math.min(model.height / effectiveZoom, vw * aspect)
           : model.height / effectiveZoom;
   const center = cameraPoint(desiredCenter, vw, vh, model.width, model.height);
-  const inFrame = (position: Point) => {
-    const screen = screenPoint(position, model.height);
-    return (
-      screen.x >= center.x - vw / 2 - 2 &&
-      screen.x <= center.x + vw / 2 + 2 &&
-      screen.y >= center.y - vh / 2 - 2 &&
-      screen.y <= center.y + vh / 2 + 2
-    );
-  };
-  const depositsInFrame = model.deposits.filter(({ value }) => inFrame(value));
-  const buildingsInFrame = model.buildings.filter(({ value }) => inFrame(value));
-  const lootInFrame = model.loot.filter(({ value }) => inFrame(value));
+  // Render the complete knowledge-filtered model; SVG/container clipping owns
+  // the viewport, including object and label extents across camera edges.
   const vp = `${center.x - vw / 2} ${center.y - vh / 2} ${vw} ${vh}`;
   useSceneMotion(
     svg,
@@ -235,7 +230,6 @@ export function Scene({
       alliance.members.map((id) => [id, alliance] as const),
     ),
   );
-  const namesVisible = labels && (model.citizens.length <= 32 || effectiveZoom >= 2);
   const labelRows = new Map<string, number>();
   const claimLabelRows = new Map(
     (model.claims ?? []).map((claim) => {
@@ -249,6 +243,45 @@ export function Scene({
     const s = screenPoint(p, model.height);
     return `translate(${s.x} ${s.y})`;
   };
+  // Composed marked-tile territories: color and emphasis come from sign-backed
+  // membership, never from legacy announcement claims.
+  const marked = markedTerritories(model);
+  const citizenName = (id: string) =>
+    model.citizens.find((citizen) => citizen.value.id === id)?.value.name ?? id;
+  const ownerColor = territoryColor;
+  const labelTerritory = (territory: Territory) => territoryLabel(territory,
+    Object.fromEntries(model.citizens.map(({ value }) => [value.id, value])));
+  const tintRect = (territory: Territory, x: number, y: number) => {
+    const membership = membershipIn(territory, selected);
+    const members = Object.keys(territory.members ?? {});
+    const color = ownerColor(territory);
+    return (
+      <rect
+        x={x + 0.04}
+        y={model.height - y - 0.96}
+        width={0.92}
+        height={0.92}
+        fill={color}
+        fillOpacity={membership === 'none' ? 0.26 : 0.48}
+        stroke={color}
+        strokeWidth={membership === 'none' ? 0.035 : 0.06}
+        strokeDasharray={membership === 'none' ? '0.12 0.1' : undefined}
+      >
+        <title>{`Marked territory of ${labelTerritory(territory)}${
+          members.length ? ` · ${members.length} member${members.length === 1 ? '' : 's'}` : ''
+        } · selected: ${membership}${
+          membership === 'none'
+            ? ' (outside membership; dashed border)'
+            : ' · solid border'
+        }`}</title>
+      </rect>
+    );
+  };
+  const signTerritory = (territoryId: string): Territory | undefined =>
+    (model.territories ?? []).find((territory) => territory.id === territoryId);
+  const houseOwnerColor = (ownerId: string | null) =>
+    (ownerId && model.citizens.find((citizen) => citizen.value.id === ownerId)?.value.color) ||
+    '#b98d5c';
   // Private work permissions belong only to the selected dossier, never other sightings.
   const strategy =
     own?.id === selected && own.strategy && ['active', 'blocked'].includes(own.strategy.status)
@@ -260,6 +293,7 @@ export function Scene({
   const occupants = tile
     ? model.citizens.filter((c) => c.value.x === tile.x && c.value.y === tile.y)
     : [];
+  const tileTerritory = tile ? marked.get(`${tile.x},${tile.y}`) : undefined;
   const selectable = (p: Point, label: string) => ({
     role: 'button',
     tabIndex: 0,
@@ -539,26 +573,34 @@ export function Scene({
           const known = sight?.get(`${x},${y}`);
           const unseen = sight && !known;
           const region = regionAt(x, y, model.width, model.height, model.ringCount);
+          // Known-tile territory tints use only signs this observer already knows.
+          const tinted = territories && known && !unseen ? marked.get(`${x},${y}`) : undefined;
           return (
-            <rect
-              key={`${x},${y}`}
-              x={x}
-              y={model.height - y - 1}
-              width="1"
-              height="1"
-              fill={
-                unseen
-                  ? '#263e38'
-                  : known?.remembered
-                    ? '#697367'
-                    : terrainColor(region, model.ringCount)
-              }
-              stroke="#4e6959"
-              strokeWidth=".025"
-              onClick={() => setTile({ x, y })}
-            >
-              <title>{`(${x}, ${y}) · ${unseen ? 'unseen' : known?.remembered ? `remembered at tick ${known.seenTick}` : region}`}</title>
-            </rect>
+            <g key={`${x},${y}`}>
+              <rect
+                x={x}
+                y={model.height - y - 1}
+                width="1"
+                height="1"
+                fill={
+                  unseen
+                    ? '#263e38'
+                    : known?.remembered
+                      ? '#697367'
+                      : terrainColor(region, model.ringCount)
+                }
+                stroke="#4e6959"
+                strokeWidth=".025"
+                onClick={() => setTile({ x, y })}
+              >
+                <title>{`(${x}, ${y}) · ${unseen ? 'unseen' : known?.remembered ? `remembered at tick ${known.seenTick}` : region}`}</title>
+              </rect>
+              {tinted && (
+                <g className="territory-tint" pointerEvents="none">
+                  {tintRect(tinted, x, y)}
+                </g>
+              )}
+            </g>
           );
         })}
         <rect width={model.width} height={model.height} fill="url(#grass)" pointerEvents="none" />
@@ -623,7 +665,7 @@ export function Scene({
         )}
         {resources && (
           <g className="resource-overlay" pointerEvents="none" aria-label="Known resource stock">
-            {depositsInFrame.map(({ value: deposit, remembered }) => (
+            {model.deposits.map(({ value: deposit, remembered }) => (
               <g key={deposit.id} transform={point(deposit)} opacity={remembered ? 0.35 : 1}>
                 <circle
                   r=".44"
@@ -638,6 +680,19 @@ export function Scene({
                   stroke={deposit.stock ? '#fff1c2' : '#725a49'}
                   strokeWidth=".035"
                 />
+              </g>
+            ))}
+          </g>
+        )}
+        {territories && !model.tiles && !!marked.size && (
+          <g
+            className="territory-overlays territory-tiles"
+            pointerEvents="none"
+            aria-label="Marked territory tiles colored by owner membership"
+          >
+            {[...marked.entries()].map(([key, territory]) => (
+              <g key={key} data-testid={`territory-tile-${key}`}>
+                {tintRect(territory, Number(key.split(',')[0]), Number(key.split(',')[1]))}
               </g>
             ))}
           </g>
@@ -677,7 +732,7 @@ export function Scene({
             <title>Intended route, not completed movement</title>
           </g>
         )}
-        {depositsInFrame.map(({ value: d, remembered, seenTick }) => (
+        {model.deposits.map(({ value: d, remembered, seenTick }) => (
           <g
             key={d.id}
             transform={point(d)}
@@ -728,7 +783,7 @@ export function Scene({
             </text>
           </g>
         ))}
-        {buildingsInFrame.map(({ value: b, remembered, seenTick }) => (
+        {model.buildings.map(({ value: b, remembered, seenTick }) => (
           <g
             key={b.id}
             transform={point(b)}
@@ -791,7 +846,57 @@ export function Scene({
             </text>
           </g>
         ))}
-        {lootInFrame.map(({ value: l, remembered }) => (
+        {(model.houses ?? []).length > 0 &&
+          (model.houses ?? []).map(({ value: h, remembered, seenTick }) => (
+            <g
+              key={h.id}
+              transform={point(h)}
+              data-entity-id={h.id}
+              className={`scene-house ${remembered ? 'remembered' : ''} ${h.ownerId === selected ? 'owned' : ''}`}
+              {...selectable(h, `Inspect house ${h.id}`)}
+            >
+              <title>{`House of ${citizenName(h.ownerId ?? 'none')} · T${h.tier} · ${h.health}/${h.maxHealth} health${remembered ? ` · last seen tick ${seenTick}` : ''}`}</title>
+              <rect
+                x="-.34"
+                y="-.24"
+                width=".68"
+                height=".54"
+                fill="#9d7b52"
+                stroke="#54463a"
+                strokeWidth=".05"
+              />
+              <path d="M-.42-.24L0-.5l.42 .26Z" fill={houseOwnerColor(h.ownerId)} stroke="#54463a" strokeWidth=".04" />
+              <path d="M-.13 .3v-.2h.26v.2" fill="#4b382a" />
+            </g>
+          ))}
+        {(model.signs ?? []).length > 0 &&
+          (model.signs ?? []).map(({ value: s, remembered, seenTick }) => {
+            const territory = signTerritory(s.territoryId);
+            const owner = territory ? labelTerritory(territory) : s.territoryId;
+            return (
+              <g
+                key={s.id}
+                transform={point(s)}
+                data-entity-id={s.id}
+                className={`territory-sign ${remembered ? 'remembered' : ''}`}
+                {...selectable(s, `Inspect territory sign ${s.id}`)}
+              >
+                <title>{`Territory sign of ${owner} · marked tile, membership authoritative in signs · T${s.woodTier} wood · ${s.health}/${s.maxHealth} health${remembered ? ` · last seen tick ${seenTick}` : ''}`}</title>
+                <path d="M0 .32v-.44" stroke="#775139" strokeWidth=".09" />
+                <rect
+                  x="-.17"
+                  y="-.44"
+                  width=".34"
+                  height=".25"
+                  rx=".04"
+                  fill={territory ? ownerColor(territory) : '#ead085'}
+                  stroke="#3f4a3a"
+                  strokeWidth=".045"
+                />
+              </g>
+            );
+          })}
+        {model.loot.map(({ value: l, remembered }) => (
           <g
             key={l.id}
             transform={point(l)}
@@ -1034,7 +1139,7 @@ export function Scene({
                   />
                   <path
                     d="M-.16-.06Q0-.15.16-.06L.13 .15h-.26Z"
-                    fill={c.color || '#c3985d'}
+                    fill={citizenColor(c)}
                     stroke="#334b41"
                     strokeWidth=".03"
                   />
@@ -1088,7 +1193,7 @@ export function Scene({
                   )}
                 </>
               )}
-              {(namesVisible || (labels && c.id === selected)) && (
+              {labels && (
                 <text y=".61" className="nameplate">
                   {c.name}
                   {remembered ? ' ◷' : ''}
@@ -1123,7 +1228,7 @@ export function Scene({
                   cx={citizen.x + 0.5}
                   cy={model.height - citizen.y - 0.5}
                   r={citizen.id === selected ? 0.5 : 0.3}
-                  fill={citizen.id === selected ? '#fff3c1' : citizen.color}
+                  fill={citizenColor(citizen)}
                 />
               ))}
               <rect
@@ -1156,6 +1261,7 @@ export function Scene({
       )}
       {!model.tiles && !compact && (
         <div className="map-layer-legend">
+          {!!marked.size && <span>▩ Marked tiles and member clothing share territory colors · unaffiliated neutral grey</span>}
           <span>□ Claims: demands, not walls</span>
           <span>▨ Hatched: rival overlap</span>
           <span>→ Red arrows: active attack / pursuit</span>
@@ -1165,6 +1271,14 @@ export function Scene({
           </span>
         </div>
       )}
+      {model.citizens.find(({ value }) => value.id === selected)?.value.territory && (
+        <div className="map-layer-legend" aria-label="Selected territory membership">
+          {(() => {
+            const member = model.citizens.find(({ value }) => value.id === selected)!.value;
+            return <span><span style={{ color: citizenColor(member) }}>●</span> {member.name}: {member.territory!.label} · {member.territory!.role}</span>;
+          })()}
+        </div>
+      )}
       <div className="map-footer">
         <span id="map-navigation-help" className="map-navigation-help">
           {compact
@@ -1172,11 +1286,8 @@ export function Scene({
             : 'Drag / scroll · focus map: +/− zoom · F/Home fit · arrows/WASD pan · Shift faster · Esc stop Follow'}
         </span>
         <span>
-          {model.citizens.length > 32 && labels && !namesVisible
-            ? 'Crowd view: zoom in for names · '
-            : ''}
           {territories && !model.tiles
-            ? 'Claims are demands; borders can be crossed'
+            ? `Claims are demands; borders can be crossed${marked.size ? ' · marked tiles form territories of their members' : ''}`
             : 'Center / inner ring / outer ring'}
         </span>
       </div>
@@ -1211,6 +1322,28 @@ export function Scene({
                 {remembered ? ` · last seen tick ${seenTick}` : ''}
               </span>
             ))}
+          {model.houses
+            ?.filter((h) => h.value.x === tile.x && h.value.y === tile.y)
+            .map(({ value: h, remembered, seenTick }) => (
+              <span key={h.id}>
+                House T{h.tier} · {h.health}/{h.maxHealth} health · owner {citizenName(h.ownerId ?? 'none')}
+                {remembered ? ` · last seen tick ${seenTick}` : ''}
+              </span>
+            ))}
+          {model.signs
+            ?.filter((s) => s.value.x === tile.x && s.value.y === tile.y)
+            .map(({ value: s, remembered, seenTick }) => (
+              <span key={s.id}>
+                Territory sign T{s.woodTier} wood · {s.health}/{s.maxHealth} health
+                {remembered ? ` · last seen tick ${seenTick}` : ''}
+              </span>
+            ))}
+          {tileTerritory && (
+            <span data-testid="tile-territory">
+              Marked territory of {labelTerritory(tileTerritory)} · selected is{' '}
+              {membershipIn(tileTerritory, selected)} member
+            </span>
+          )}
         </div>
       )}
     </section>

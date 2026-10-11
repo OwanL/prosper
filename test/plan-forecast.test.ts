@@ -39,7 +39,7 @@ describe('bounded observation-only plan forecasts', () => {
     const f = forecastPlan(o, { mode: 'replace', steps: [{ type: 'wait', ticks: 1 }] });
     expect(f.state.inventory['food:1']).toEqual({ min: 0, max: 0 });
     expect(f.state.inventory['food:2']).toEqual({ min: 1, max: 1 });
-    expect(f.state.fullness.min).toBeCloseTo(79.9 + nutrition(1));
+    expect(f.state.fullness.min).toBeCloseTo(80 - BALANCE.fullnessDrain + nutrition(1));
     expect(f.assumptions.join(' ')).toContain('Health estimates exclude external damage');
   });
 
@@ -247,7 +247,7 @@ describe('bounded observation-only plan forecasts', () => {
     const f = forecastPlan(o, { mode: 'replace', steps: [{ type: 'gather', resource: 'wood', tier: 1, targetQuantity: 1, maxTicks: BALANCE.regrowTicks + BALANCE.harvestTicks }] });
     expect(f.state.inventory['wood:1']!.max).toBe(1);
     expect(f.steps[0]!.duration.conditional.min).toBe(BALANCE.regrowTicks + BALANCE.harvestTicks);
-    o.citizen.fullness = 1;
+    o.citizen.fullness = 10 * BALANCE.fullnessDrain;
     const stopped = forecastPlan(o, { mode: 'replace', steps: [{ type: 'wait', ticks: 100, stopWhen: { kind: 'food-runway-below', ticks: 8 } }] });
     expect(stopped.steps[0]!.duration.conditional.max).toBeLessThan(5);
     expect(stopped.steps[0]!.ticks.max).toBeNull();

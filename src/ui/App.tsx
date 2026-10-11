@@ -13,7 +13,7 @@ import { AnalyticsPanel } from './AnalyticsPanel';
 import { Inspector } from './CitizenInspector';
 import { BudgetPanel } from './BudgetSettings';
 import { CitizenRoster, WorldActivity } from './WorldActivity';
-import { projectObservation, projectWorld } from './model';
+import { projectObservation, projectWorld, presentationWorld, withoutControllerSummary } from './model';
 import { CitizenMotivation } from './Spectator';
 import './game-shell.css';
 
@@ -351,7 +351,7 @@ export function App() {
             disabled={unavailable}
             onChange={(event) => void control({ type: 'speed', speed: Number(event.target.value) })}
           >
-            {[...new Set([1, 2, 4, 8, snapshot?.status.speed ?? 1])]
+            {[...new Set([1, 2, 4, 8, 16, 32, 64, snapshot?.status.speed ?? 1])]
               .sort((a, b) => a - b)
               .map((speed) => (
                 <option key={speed} value={speed}>
@@ -472,7 +472,7 @@ export function App() {
               follow={follow}
               labels={labels}
               running={!unavailable && !!snapshot?.status.running && !knowledge}
-              own={citizen}
+              own={citizen ? withoutControllerSummary(citizen) : undefined}
             />
           ) : (
             <div className="game-empty">
@@ -519,7 +519,7 @@ export function App() {
               )}
               {surface === 'charts' &&
                 (world ? (
-                  <AnalyticsPanel world={world} knowledge={knowledge} />
+                  <AnalyticsPanel world={presentationWorld(world)} knowledge={knowledge} />
                 ) : (
                   <p className="game-empty">Waiting for recorded world data.</p>
                 ))}
@@ -710,6 +710,13 @@ export function App() {
                   </section>
                   <section>
                     <h3>Advanced</h3>
+                    <label>
+                      <input type="checkbox" checked={snapshot?.status.decisionTreeDebug ?? false}
+                        disabled={unavailable}
+                        onChange={(event) => void control({ type: 'decision-tree-debug', enabled: event.target.checked })} />
+                      Decision-tree diagnostics
+                    </label>
+                    <p className="game-explanation">Includes extra retained controller data and may increase transfer and rendering cost. Turning this off does not disable Local AI or the normal mind summary.</p>
                     {snapshot && (
                       <BudgetPanel
                         snapshot={snapshot}
@@ -806,6 +813,8 @@ export function App() {
                       (citizen ? (
                         <Inspector
                           citizen={citizen}
+                          territory={model?.citizens.find(c => c.value.id === citizen.id)?.value.territory}
+                          decisionTreeDebug={!knowledge && !!snapshot?.status.decisionTreeDebug}
                           unavailable={unavailable || knowledge}
                           cancel={() => void cancel()}
                           result={receipt}
@@ -820,7 +829,7 @@ export function App() {
                     {detailTab === 'policy' &&
                       (citizen ? (
                         <>
-                          <CitizenMotivation citizen={citizen} />
+                          <CitizenMotivation citizen={withoutControllerSummary(citizen)} />
                           {citizen.autonomy && (
                             <>
                               <h3>Recent personal evidence</h3>
@@ -853,7 +862,7 @@ export function App() {
                           Private historical graphs are hidden in citizen knowledge view.
                         </p>
                       ) : world && selected ? (
-                        <HistoryCharts world={world} selectedId={selected} scope="citizen" />
+                        <HistoryCharts world={presentationWorld(world)} selectedId={selected} scope="citizen" />
                       ) : (
                         <p>Select a citizen to see retained history.</p>
                       ))}

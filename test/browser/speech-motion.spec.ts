@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import { createWorld } from '../../src/world/core';
 
 function fixture(): AppSnapshot {
@@ -8,7 +8,7 @@ function fixture(): AppSnapshot {
   const citizens = Object.values(world.citizens);
   citizens.forEach(c => { c.x = Math.floor(world.width / 2); c.y = Math.floor(world.height / 2); c.action = null; });
   world.messages = citizens.map((c, i) => ({ id: `speech-${i}`, from: c.id, tick: 100, text: i === 0 ? 'Short.' : `${i}: <b>not markup</b> ${'A longer public announcement. '.repeat(18)}` }));
-  return { world, status: { state: 'ready', running: false, speed: 1, mode: 'scripted', generation: 1, thinking: [] }, budget: { requests: 0, limit: 100, pending: 0, spent: 0, tokens: 0, maxTokens: 100000, unit: 'requests' }, turns: [] };
+  return { world, status: { decisionTreeDebug: false, state: 'ready', running: false, speed: 1, mode: 'scripted', generation: 1, thinking: [] }, budget: { requests: 0, limit: 100, pending: 0, spent: 0, tokens: 0, maxTokens: 100000, unit: 'requests' }, turns: [] };
 }
 async function offline(page: Page, snapshot: AppSnapshot) {
   const mutations: string[] = [];
@@ -16,7 +16,7 @@ async function offline(page: Page, snapshot: AppSnapshot) {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (request.method() === 'GET' && path === '/api/state') {
-      await route.fulfill({ json: snapshot });
+      await route.fulfill({ json: spectatorFixture(snapshot) });
     } else if (request.method() === 'GET' && path === '/api/history/global') {
       await route.fulfill({ json: { runId: snapshot.world.runId, tick: snapshot.world.tick, startedTick: 0, cadence: 20, limit: 256, frames: [] } });
     } else if (request.method() === 'GET' && path === '/api/motion') {
@@ -170,7 +170,7 @@ test('slow confirmed movement keeps follow camera and sprite on the same RAF fra
       citizen.x += 1;
       snapshot.world.tick++;
     }
-    await route.fulfill({ json: snapshot });
+    await route.fulfill({ json: spectatorFixture(snapshot) });
   });
   await expect(sprite).toHaveAttribute('data-moving', 'true', { timeout: 6000 });
   const samples = await sprite.evaluate(async element => {

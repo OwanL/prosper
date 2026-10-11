@@ -204,7 +204,7 @@ export function planningContext(
       reproduction: BALANCE.reproductionTicks,
       regrowthAfterHarvest: BALANCE.regrowTicks,
       instant:
-        'orders, cancel-order, transfer, consent, message, goals, remember, cancel; these do not extend your physical-work horizon and are not delayed by queue=append.',
+        'orders, cancel-order, transfer, message, goals, remember, cancel; these do not extend your physical-work horizon and are not delayed by queue=append.',
     },
     food: {
       snapshotTick: observation.tick,

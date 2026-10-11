@@ -3,17 +3,26 @@ import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CitizenObservation, WorldEvent } from '../src/shared/types.ts';
 import type { CommitRecord } from '../src/evaluation/contracts.ts';
-import { initializeFixture, totalGold } from '../src/evaluation/fixtures.ts';
+import { fixtureSchema, initializeFixture, totalGold } from '../src/evaluation/fixtures.ts';
 import { createNoCommandCandidate } from '../src/evaluation/candidates/no-command.ts';
 import { runEpisode, replayEpisode, type EpisodeReport } from '../src/evaluation/runner.ts';
+import { BALANCE, nutrition } from '../src/world/config.ts';
 import { productionTradeFixture, productionTradeReference, PRODUCTION_TRADE_SITE } from '../src/evaluation/development/production-trade.ts';
 
+// Preserve the authored 32-fullness decay exposure while food lasts longer.
+const horizon = Math.round(32 / BALANCE.fullnessDrain);
+const finalFedFullness = 80 + 4 * nutrition(1) - horizon * BALANCE.fullnessDrain;
 const outputs: string[] = [];
 afterEach(() => {
   for (const path of outputs.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 async function run(...args: Parameters<typeof runEpisode>) {
-  const report = await runEpisode(...args);
+  // Trace writing and replay compete with other forked tests for CPU/I/O.
+  // Keep balance-derived tick/decision checks authoritative, not wall throughput.
+  const [fixture, candidate, options] = args;
+  const report = await runEpisode({ ...fixtureSchema.parse(fixture), horizon }, candidate, {
+    ...options, limits: { episodeTimeoutMs: 60000, ...options?.limits },
+  });
   outputs.push(report.outputDirectory);
   return report;
 }
@@ -29,13 +38,13 @@ function trace(report: EpisodeReport): TraceRecord[] {
 }
 function assertAccountingAndReplay(report: EpisodeReport, records: TraceRecord[]) {
   expect(report.status).toBe('complete');
-  expect(report.ticks).toBe(320);
-  expect(report.decisions).toBe(320);
+  expect(report.ticks).toBe(horizon);
+  expect(report.decisions).toBe(horizon);
   expect(report.failures).toBe(0);
   expect(report.usage).toMatchObject({ modelCalls: 0, tokens: 0 });
   expect(report.accountingValid).toBe(true);
   expect(records.every(record => record.totalGold === 16 && record.initialGold === 16)).toBe(true);
-  expect(records.filter(record => record.kind === 'tick').map(record => record.tick)).toEqual(Array.from({ length: 320 }, (_, i) => i + 1));
+  expect(records.filter(record => record.kind === 'tick').map(record => record.tick)).toEqual(Array.from({ length: horizon }, (_, i) => i + 1));
   expect(replayEpisode(report.outputDirectory).stateHash).toBe(report.outcome.stateHash);
 }
 
@@ -98,19 +107,21 @@ describe('authored real-engine production/trade development probe', () => {
     expect(commands[2].holders.find(holder => holder.id === ids[2])?.inventory['wood:1']).toBe(1);
     expect(commands[3].commit?.dispatchResult?.order).toMatchObject({ filledQuantity: 4, remainingQuantity: 0, goldPaid: 16 });
     expect(commands[3].actor).toMatchObject({ gold: 0, inventory: { 'food:1': 4 } });
-    expect(commands[3].immediateObservation?.citizen.fullness).toBeCloseTo(71.5, 8);
+    expect(commands[3].immediateObservation?.citizen.fullness).toBeCloseTo(80 - 85 * BALANCE.fullnessDrain, 8);
     expect(commands[3].holders.find(holder => holder.id === ids[1])?.gold).toBe(16);
     const actorMeals = records.flatMap(record => record.events.filter(event => event.kind === 'meal' && event.citizenId === actorId));
-    expect(actorMeals.map(event => event.tick)).toEqual([86, 87, 134, 245]);
+    expect(actorMeals.map(event => event.tick)).toEqual([86, 87,
+      Math.ceil((80 + 3 * nutrition(1) - BALANCE.maxFullness) / BALANCE.fullnessDrain),
+      Math.ceil((80 + 4 * nutrition(1) - BALANCE.maxFullness) / BALANCE.fullnessDrain)]);
     expect(report.outcome.actor).toMatchObject({ alive: true, health: 100, gold: 0, action: null, queue: [] });
     expect(report.outcome.actor.inventory['wood:1'] ?? 0).toBe(0);
     expect(report.outcome.actor.inventory['food:1'] ?? 0).toBe(0);
-    expect(report.outcome.actor.fullness).toBeCloseTo(92.44444444444444, 8);
+    expect(report.outcome.actor.fullness).toBeCloseTo(finalFedFullness, 8);
     expect(Object.values(report.outcome.orders)).toHaveLength(0);
     expect(report.outcome.holders.every(holder => holder.alive && holder.health === 100)).toBe(true);
     const retained = JSON.parse(readFileSync(join(report.outputDirectory, 'initialization.json'), 'utf8'));
     expect(JSON.stringify(retained)).toContain('authored-script-sha256:');
-  });
+  }, 90000);
 
   it('compares no-command with and without authored meal endowments, with no strategic rescue or trades', async () => {
     for (const food of [0, 4] as const) {
@@ -118,7 +129,7 @@ describe('authored real-engine production/trade development probe', () => {
       const records = trace(report);
       assertAccountingAndReplay(report, records);
       expect(report.success).toBe(food === 4);
-      expect(report.outcome.actor.fullness).toBeCloseTo(food === 4 ? 92.44444444444444 : 48, 8);
+      expect(report.outcome.actor.fullness).toBeCloseTo(food === 4 ? finalFedFullness : 80 - horizon * BALANCE.fullnessDrain, 8);
       expect(report.outcome.actor).toMatchObject({ alive: true, health: 100, gold: 0, action: null, queue: [] });
       expect(report.outcome.actor.inventory['wood:1'] ?? 0).toBe(0);
       expect(records.filter(record => record.kind === 'decision').every(record => record.commit?.decision?.kind === 'advance' && record.commit.dispatchResult === undefined)).toBe(true);
@@ -129,5 +140,5 @@ describe('authored real-engine production/trade development probe', () => {
       expect(Object.values(report.outcome.orders).find(order => order.side === 'buy')?.escrowGold).toBe(16);
       expect(Object.values(report.outcome.orders).find(order => order.side === 'sell')?.escrowItems).toEqual({ 'food:1': 4 });
     }
-  });
+  }, 150000);
 });

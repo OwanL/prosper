@@ -30,6 +30,9 @@ function compactTile(tile: TileMemory) {
     x: tile.x,
     y: tile.y,
     seenTick: tile.seenTick,
+    ...(tile.observedTerritoryId !== undefined
+      ? { observedTerritoryId: tile.observedTerritoryId }
+      : {}),
     ...(tile.citizens.length ? { citizens: tile.citizens } : {}),
     ...(tile.deposits.length ? { deposits: tile.deposits } : {}),
     ...(tile.buildings.length ? { buildings: tile.buildings } : {}),
@@ -52,10 +55,12 @@ export function providerContext(observation: CitizenObservation) {
     return false;
   });
   const remembered: ReturnType<typeof compactTile>[] = [];
-  const rememberedEmpty: [number, number, number][] = [];
+  const rememberedEmpty: ([number, number, number] | [number, number, number, string | null])[] = [];
   for (const tile of observation.remembered) {
     if (tile.citizens.length || tile.deposits.length || tile.buildings.length || tile.loot.length)
       remembered.push(compactTile(tile));
+    else if (tile.observedTerritoryId !== undefined)
+      rememberedEmpty.push([tile.x, tile.y, tile.seenTick, tile.observedTerritoryId]);
     else rememberedEmpty.push([tile.x, tile.y, tile.seenTick]);
   }
   return {
@@ -75,7 +80,7 @@ export function providerContext(observation: CitizenObservation) {
     remembered,
     rememberedEmpty: rememberedEmpty.length ? rememberedEmpty : undefined,
     rememberedFormat: observation.remembered.length
-      ? 'Dated sightings, not live facts. Missing entity arrays are empty. rememberedEmpty entries are [x,y,seenTick]: observed empty then, not never explored.'
+      ? 'Dated sightings, not live facts. Missing entity arrays are empty. rememberedEmpty entries are [x,y,seenTick] when territory is unknown, or [x,y,seenTick,observedTerritoryId] when territory was observed (null means no mark): observed empty then, not never explored.'
       : undefined,
   };
 }

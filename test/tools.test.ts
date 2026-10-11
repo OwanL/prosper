@@ -13,8 +13,9 @@ describe('provider command schema', () => {
     expect(parameters.anyOf).toBeUndefined();
     expect(parameters.oneOf).toBeUndefined();
     expect(parameters.properties.type.enum).toEqual(
-      commandSchema.options.map((s) => s.shape.type.value),
+      commandSchema.options.map((s) => s.shape.type.value).filter(type => type !== 'consent'),
     );
+    expect(parameters.properties.type.enum).not.toContain('consent');
     expect(parameters.properties.type.enum).not.toContain('equip');
     expect(parameters.properties.type.enum).not.toContain('unequip');
     expect(parameters.properties.kind.enum).toEqual(['lumbermill', 'spinning-wheel', 'butchery', 'wall']);

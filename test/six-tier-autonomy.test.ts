@@ -3,7 +3,7 @@ import { createWorld, dispatch, tickWorld } from '../src/world/core.ts';
 import { enableAutonomy, foodRunway, productionSaturated } from '../src/world/autonomy.ts';
 import { downconversionCommand, equipmentCommand, projectCommand } from '../src/world/production.ts';
 import { updateKnowledge, observe } from '../src/world/observation.ts';
-import { equipmentRecipe, nutrition } from '../src/world/config.ts';
+import { BALANCE, equipmentRecipe, nutrition } from '../src/world/config.ts';
 import { MAX_TIER } from '../src/shared/tiers.ts';
 import { scriptedCommands } from '../src/citizen/scripted.ts';
 
@@ -43,7 +43,7 @@ describe('six-tier local production',()=>{
   });
   it('counts all food tiers and permits expensive high-tier input accumulation',()=>{
     const {world,citizen}=fixture();citizen.inventory={'food:6':2,'wood:6':95};
-    expect(foodRunway(citizen)).toBe((citizen.fullness+2*nutrition(6))/.1);
+    expect(foodRunway(citizen)).toBe((citizen.fullness+2*nutrition(6))/BALANCE.fullnessDrain);
     citizen.autonomy!.productionGoal={item:'knife',tier:6};expect(productionSaturated(world,citizen)).toBe(false);
   });
   it('legacy demonstration uses carried T6 tools and requires exponential T2 craft amounts',()=>{

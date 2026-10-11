@@ -160,6 +160,16 @@
   color: #c5d1dd;
   font-size: 10px;
 }
+.roster-swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid #c5d1dd; border-radius: 50%; margin-right: 6px; }
+.roster-economy { font-variant-numeric: tabular-nums; }
+.roster-resource-summary { display: flex; flex-wrap: wrap; gap: 3px 6px; max-width: 100%; font-size: 11px; color: #c5d1dd; }
+.roster-resource-chip { padding: 1px 5px; border: 1px solid #405b6c; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.roster-membership { color: #c5d1dd; font-size: 11px; }
+.roster-search select { width: 100%; padding: 5px; background: #0f1e2a; color: var(--activity-ink); border: 1px solid #4b6275; border-radius: 5px; }
+.roster-search input + label { margin-top: 8px; }
+.roster-resources { padding: 0 12px 8px; font-size: 11px; }
+.roster-resources summary { cursor: pointer; color: var(--activity-muted); }
+.roster-resources div { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-top: 5px; }
 .roster-dead {
   color: #edc6c3;
   border-color: #856260;
@@ -184,3 +194,8 @@
     -webkit-line-clamp: 1;
   }
 }
+
+.territory-overview { margin: .5rem 0; }
+.territory-filter-list { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+.territory-filter-list button { text-align: left; font-size: .8rem; }
+.territory-filter-list button[aria-pressed="true"] { outline: 2px solid #b9d4e7; }

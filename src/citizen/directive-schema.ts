@@ -236,7 +236,7 @@ export const strategyParameters = {
           },
           partnerId: {
             type: 'string',
-            description: 'reproduce: known person; no invented consent or control of their work',
+            description: 'reproduce: nearby eligible known person; one T1 food per parent, no consent prerequisite',
           },
           x: integer,
           y: integer,

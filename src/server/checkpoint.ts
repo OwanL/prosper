@@ -18,12 +18,16 @@ import { validateResponse } from '../citizen/provider.ts';
 import type { RecordedTurn } from '../citizen/index.ts';
 import type { PlannerMode, World } from '../shared/types.ts';
 import { CARRIED_ITEM_RE, EQUIPMENT_ITEM_RE, RESOURCE_ITEM_RE, TRADABLE_ITEM_RE, MAX_TIER, isTier } from '../shared/tiers.ts';
-import { BALANCE, buildingRecipe, equipmentRecipe, refinementRecipe, STATION_RESOURCE } from '../world/config.ts';
-import { autonomyStateSchema, claimSchema, allianceSchema } from './autonomy-checkpoint.ts';
+import { BALANCE, houseRecipe, buildingRecipe, equipmentRecipe, refinementRecipe, STATION_RESOURCE } from '../world/config.ts';
+import { composedCommandSchema, mindSchema, territorySchema, signSchema, houseSchema, reputationSchema, autonomyStateSchema, claimSchema, allianceSchema } from './autonomy-checkpoint.ts';
 import { HISTORY_LIMIT } from '../shared/telemetry-types.ts';
+import { cancelLegacyBuildingOrders } from '../world/market.ts';
 
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const positive = count.min(1);
+const quantity = z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const nonzeroQuantity = quantity.positive();
+const physicalCommandSchema = z.union([commandSchema, composedCommandSchema]);
 const text = z.string();
 const identity = text.min(1).max(200);
 const worldEventSchema = z
@@ -37,20 +41,35 @@ const worldEventSchema = z
     x: count.optional(),
     y: count.optional(),
     audience: z.array(identity).optional(),
+    familyInvitation: z.object({
+      fromId: identity,
+      toId: identity,
+      expiresTick: count,
+      status: z.enum(['offered', 'withdrawn']),
+    }).strict().optional(),
+    trade: z.object({
+      buyOrderId: identity,
+      sellOrderId: identity,
+      item: text.regex(CARRIED_ITEM_RE),
+      quantity: z.number().finite().positive(),
+      price: z.number().finite().positive(),
+      buyerId: identity,
+      sellerId: identity,
+    }).strict().optional(),
   })
   .strict();
 const tier = z.number().int().refine(isTier, 'Invalid tier');
 const point = { x: count, y: count };
 const inventory = z.record(
   z.string().regex(CARRIED_ITEM_RE),
-  count,
+  quantity,
 );
 // Migration-only vocabulary; never advertised by the active command API.
 const obsoleteCommand = z.discriminatedUnion('type', [
   z.object({ type: z.literal('equip'), item: text.regex(TRADABLE_ITEM_RE), queue: z.enum(['replace', 'append']).optional() }).strict(),
   z.object({ type: z.literal('unequip'), kind: z.enum(['axe', 'scythe', 'knife', 'sword']), queue: z.enum(['replace', 'append']).optional() }).strict(),
 ]);
-const savedCommand = z.union([commandSchema, obsoleteCommand]);
+const savedCommand = z.union([physicalCommandSchema, obsoleteCommand]);
 const obsoleteStep = planSpecSchema.shape.steps.element.options[0].extend({
   command: z.union([
     obsoleteCommand.options[0].omit({ queue: true }).extend({ item: text.regex(EQUIPMENT_ITEM_RE) }),
@@ -94,8 +113,8 @@ const deposit = z
     id: identity,
     resource: z.enum(['food', 'wood', 'fibre']),
     tier,
-    stock: count,
-    capacity: positive,
+    stock: quantity,
+    capacity: nonzeroQuantity,
     regrowAt: count,
   })
   .strict();
@@ -108,12 +127,24 @@ const sighting = z
     alive: z.boolean(),
     health: z.number().min(0).max(100),
     activity: text,
+    busy: z.boolean().optional(),
+    inventory: inventory.optional(),
+    gold: quantity.optional(),
+    publicWork: z.object({
+      kind: z.literal('harvest'),
+      depositId: identity,
+      phase: z.enum(['travel', 'harvest']),
+      remainingTicks: count,
+      harvestTicks: count,
+      toolTier: tier.optional(),
+    }).strict().optional(),
   })
   .strict();
 const memory = z
   .object({
     ...point,
     seenTick: count,
+    observedTerritoryId: identity.nullable().optional(),
     citizens: z.array(sighting),
     deposits: z.array(deposit),
     buildings: z.array(building),
@@ -123,7 +154,7 @@ const memory = z
 const action = z
   .object({
     id: identity,
-    command: commandSchema,
+    command: physicalCommandSchema,
     phase: z.enum(['travel', 'work']),
     startedTick: count,
     elapsed: count,
@@ -163,7 +194,7 @@ const planReceipt = z
         inventory,
         fullness: z.number().min(0).max(100),
         health: z.number().min(0).max(100),
-        gold: count,
+        gold: quantity,
       })
       .strict(),
   })
@@ -215,6 +246,8 @@ const directiveReceipt = z
 const citizen = z
   .object({
     autonomy: autonomyStateSchema.optional(),
+    mind: mindSchema.optional(),
+    rest: z.object({ value: z.number().min(0).max(100), sleepingHouseId: identity.optional() }).strict().optional(),
     // Migration-only servicing counters; validated, then discarded on restore.
     maintenance: z
       .object({
@@ -233,7 +266,7 @@ const citizen = z
     alive: z.boolean(),
     health: z.number().min(0).max(100),
     fullness: z.number().min(0).max(100),
-    gold: count,
+    gold: quantity,
     inventory,
     equipment: equipment.optional(),
     action: action.nullable(),
@@ -264,7 +297,7 @@ const citizen = z
   })
   .strict();
 const boundedVital = z.number().min(0).max(100);
-const telemetryFlow = z.object({ units: count, turnover: count, fills: count }).strict();
+const telemetryFlow = z.object({ units: quantity, turnover: quantity, fills: count }).strict();
 const telemetrySchema = z.object({
   version: z.literal(1),
   startedTick: count,
@@ -274,14 +307,14 @@ const telemetrySchema = z.object({
     meanHealth: boundedVital,
     meanFullness: boundedVital,
     citizens: z.record(identity, z.object({
-      alive: z.boolean(), cash: count, escrow: count,
+      alive: z.boolean(), cash: quantity, escrow: quantity,
       health: boundedVital, fullness: boundedVital,
     }).strict()),
     markets: z.record(text.regex(CARRIED_ITEM_RE), z.object({
       bid: positive.nullable(), ask: positive.nullable(),
       lastPrice: positive.nullable(), lastTick: count.nullable(),
-      supply: count, demand: count, carried: count, held: count, ground: count,
-      units: count, turnover: count, fills: count,
+      supply: quantity, demand: quantity, carried: quantity, held: quantity, ground: quantity,
+      units: quantity, turnover: quantity, fills: count,
     }).strict()),
   }).strict()).min(1).max(HISTORY_LIMIT),
   pending: z.record(text.regex(CARRIED_ITEM_RE), telemetryFlow),
@@ -289,6 +322,12 @@ const telemetrySchema = z.object({
 }).strict();
 const worldSchema = z
   .object({
+    controllerMode: z.enum(['legacy', 'composed']).optional(),
+    territories: z.record(identity, territorySchema).optional(),
+    signs: z.record(identity, signSchema).optional(),
+    houses: z.record(identity, houseSchema).optional(),
+    reputations: reputationSchema.optional(),
+    offenseCooldowns: z.record(identity, count).optional(),
     telemetry: telemetrySchema.optional(),
     claims: z.record(text, claimSchema).optional(),
     alliances: z.record(text, allianceSchema).optional(),
@@ -316,18 +355,19 @@ const worldSchema = z
           citizenId: identity,
           side: z.enum(['buy', 'sell']),
           item: text.regex(TRADABLE_ITEM_RE),
-          quantity: positive,
+          quantity: nonzeroQuantity,
           price: positive,
           createdTick: count,
           sequence: count,
-          escrowGold: count,
+          escrowGold: quantity,
           escrowItems: inventory,
+          requestId: identity.nullable().optional(),
         })
         .strict(),
     ),
     loot: z.record(
       text,
-      z.object({ ...point, id: identity, citizenName: text, gold: count, inventory }).strict(),
+      z.object({ ...point, id: identity, citizenName: text, gold: quantity, inventory }).strict(),
     ),
     messages: z.array(
       z
@@ -345,6 +385,7 @@ export interface Checkpoint {
   world: World;
   runtime: {
     running: boolean;
+    decisionTreeDebug?: boolean;
     speed: number;
     mode: PlannerMode;
     commandSequence: number;
@@ -359,6 +400,7 @@ const envelope = z
     runtime: z
       .object({
         running: z.boolean(),
+        decisionTreeDebug: z.boolean().optional(),
         speed: z.number().min(0.1).max(100),
         mode: z.enum(['scripted', 'live', 'recorded']),
         commandSequence: count,
@@ -382,6 +424,8 @@ export function validateCheckpoint(value: unknown): Checkpoint {
     );
   const cp = parsed.data as Checkpoint;
   const w = cp.world;
+  // An untagged checkpoint predates composition; never silently opt it into new mechanics.
+  demand(w.controllerMode !== 'composed' || cp.runtime.mode === 'scripted', 'composed runtime requires Local AI');
   // Retire only servicing state. Tools, reservations, progress and history stay intact.
   Reflect.deleteProperty(w, 'maintenance');
   for (const c of Object.values(w.citizens)) Reflect.deleteProperty(c, 'maintenance');
@@ -418,6 +462,36 @@ export function validateCheckpoint(value: unknown): Checkpoint {
       if ('x' in entity) demand(inBounds(entity), 'entity outside map');
     }
   }
+  const affiliations = new Set<string>();
+  const markedTiles = new Set<string>();
+  for (const [key, t] of Object.entries(w.territories ?? {})) {
+    unique(t.id);
+    const memberSequences = new Set<number>();
+    demand(key === t.id && w.citizens[t.ownerId]?.alive && !!t.members[t.ownerId] && t.createdTick <= w.tick, 'territory owner/identity');
+    for (const [memberId, m] of Object.entries(t.members)) {
+      demand(memberId === m.citizenId && w.citizens[memberId]?.alive && m.joinedTick <= w.tick && !affiliations.has(memberId), 'territory membership');
+      demand(!memberSequences.has(m.sequence), 'duplicate membership sequence');
+      memberSequences.add(m.sequence);
+      affiliations.add(memberId);
+    }
+    for (const a of t.admissions) {
+      unique(a.id);
+      demand(!!w.citizens[a.applicantId] && a.requestedTick <= w.tick && a.expiresTick > a.requestedTick, 'admission applicant/time');
+      demand(Object.keys(a.votes).every((v) => a.status === 'pending' ? !!t.members[v] : !!w.citizens[v]), 'admission voter');
+    }
+    demand(Object.values(w.signs ?? {}).some((s) => s.territoryId === t.id), 'territory has no signs');
+  }
+  for (const [key, s] of Object.entries(w.signs ?? {})) {
+    demand(key === s.id && !!w.territories?.[s.territoryId] && inBounds(s) && s.health <= s.maxHealth, 'sign identity/health');
+    unique(s.id);
+    const tile = `${s.x},${s.y}`;
+    demand(!markedTiles.has(tile), 'overlapping signs'); markedTiles.add(tile);
+  }
+  for (const [key, h] of Object.entries(w.houses ?? {})) {
+    demand(key === h.id && w.citizens[h.ownerId]?.alive && inBounds(h) && h.health <= h.maxHealth, 'house identity/health'); unique(h.id);
+  }
+  for (const [observer, opinions] of Object.entries(w.reputations ?? {}))
+    demand(!!w.citizens[observer] && Object.keys(opinions).every((id) => !!w.citizens[id]), 'reputation identity');
   let gold =
     Object.values(w.citizens).reduce((n, c) => n + c.gold, 0) +
     Object.values(w.loot).reduce((n, l) => n + l.gold, 0);
@@ -438,6 +512,33 @@ export function validateCheckpoint(value: unknown): Checkpoint {
   for (const d of Object.values(w.deposits))
     demand(d.stock <= d.capacity, 'deposit stock exceeds capacity');
   for (const c of Object.values(w.citizens)) {
+    if (c.rest?.sleepingHouseId) demand(!!w.houses?.[c.rest.sleepingHouseId], 'rest house');
+    if (c.mind) {
+      const m = c.mind;
+      const taskIds = new Set(m.tasks.map((t) => t.id));
+      demand(taskIds.size === m.tasks.length && (!m.activeTaskId || m.tasks.some((t) => t.id === m.activeTaskId && t.status === 'running')), 'mind task identity');
+      const receiptIds = new Set(m.receipts.map((r) => r.id));
+      demand(receiptIds.size === m.receipts.length, 'duplicate delivery receipt');
+      for (const r of m.receipts) demand(r.citizenId === c.id && r.tick <= w.tick, 'delivery recipient/time');
+      const allocated = new Set<string>();
+      for (const t of m.tasks) {
+        demand(t.startedTick <= t.lastProgressTick && t.lastProgressTick <= w.tick && (!t.parentId || taskIds.has(t.parentId)), 'task time/parent');
+        demand(new Set(t.ancestry).size === t.ancestry.length, 'repeated active ancestry');
+        // Event evidence is a separate channel: bounded ids that may reference
+        // expired events, but never a duplicate or a disguised receipt allocation.
+        if (t.evidenceIds)
+          demand(new Set(t.evidenceIds).size === t.evidenceIds.length &&
+            t.evidenceIds.every((eid) => !receiptIds.has(eid)), 'evidence channel separation');
+        let total = 0;
+        for (const id of t.receiptIds) {
+          const r = m.receipts.find((r) => r.id === id);
+          demand(r && !allocated.has(id) && r.requestId === t.request.id && r.item === `${t.request.resource}:${t.request.tier}`, 'delivery allocation');
+          allocated.add(id); total += r!.quantity;
+        }
+        demand(Math.abs(total - t.delivered) <= 1e-9, 'net delivery evidence');
+      }
+      demand(m.memories.every((e) => e.tick <= w.tick) && m.trace.every((e) => e.tick <= w.tick), 'mind future evidence');
+    }
     demand(c.alive === c.health > 0, 'citizen life/health mismatch');
     for (const [kind, item] of Object.entries(parsed.data.world.citizens[c.id].equipment ?? {}))
       demand(
@@ -467,7 +568,8 @@ export function validateCheckpoint(value: unknown): Checkpoint {
             partnerAction.command.partnerId === c.id &&
             a.elapsed === partnerAction.elapsed &&
             a.duration === partnerAction.duration &&
-            a.startedTick === partnerAction.startedTick,
+            a.startedTick === partnerAction.startedTick &&
+            JSON.stringify(a.reserved) === JSON.stringify(partnerAction.reserved),
           'joint reproduction identity/progress',
         );
         if (c.id < a.partnerId!) unique(a.id); // paired actions intentionally share one completion ID
@@ -476,13 +578,18 @@ export function validateCheckpoint(value: unknown): Checkpoint {
         unique(a.id);
       }
       demand(
-        ['move', 'harvest', 'craft', 'build', 'refine', 'attack', 'loot', 'reproduce'].includes(
+        ['move', 'harvest', 'craft', 'build', 'refine', 'attack', 'loot', 'reproduce', 'attack-sign', 'build-house', 'sleep'].includes(
           a.command.type,
         ),
         'nonphysical action',
       );
+      // Sleep duration is an initial estimate, not a completion deadline: core
+      // settles work only after the minimum ticks AND the requested rest level.
+      // Keep the strict deadline for travel and all time-completed physical work.
+      const restCompletedWork = a.command.type === 'sleep' && a.phase === 'work';
       demand(
-        c.alive && a.startedTick <= w.tick && a.elapsed < a.duration && inBounds(a.target),
+        c.alive && a.startedTick <= w.tick &&
+          (a.elapsed < a.duration || restCompletedWork) && inBounds(a.target),
         'action progress/target',
       );
       let previous =
@@ -515,8 +622,12 @@ export function validateCheckpoint(value: unknown): Checkpoint {
             [`${key.split(':')[0]}:${command.tier}`, n]));
         }
       }
-      if (a.command.type === 'reproduce')
+      if (a.command.type === 'build-house') recipe = houseRecipe(a.command.tier);
+      if (a.command.type === 'reproduce') {
         recipe = { [`food:${BALANCE.reproductionFoodTier}`]: BALANCE.reproductionFood };
+        // In-flight legacy commitments retain their original payment and refund.
+        legacyRecipe = { 'food:2': 3 };
+      }
       if (a.command.type === 'refine') {
         const station = w.buildings[a.command.buildingId];
         // A suspended station may have disappeared while the body detoured;
@@ -638,11 +749,11 @@ export function validateCheckpoint(value: unknown): Checkpoint {
   }
   for (const o of Object.values(w.orders)) {
     demand(w.citizens[o.citizenId]?.alive && o.createdTick <= w.tick, 'order owner/tick');
-    demand(Number.isSafeInteger(o.quantity * o.price), 'order amount overflow');
+    demand(Number.isFinite(o.quantity * o.price) && o.quantity * o.price <= Number.MAX_SAFE_INTEGER, 'order amount overflow');
     gold += o.escrowGold;
     if (o.side === 'buy')
       demand(
-        o.escrowGold === o.quantity * o.price && Object.values(o.escrowItems).every((n) => n === 0),
+        Math.abs(o.escrowGold - o.quantity * o.price) <= 1e-9 && Object.values(o.escrowItems).every((n) => n === 0),
         'buy escrow',
       );
     else {
@@ -663,7 +774,7 @@ export function validateCheckpoint(value: unknown): Checkpoint {
         );
     }
   }
-  demand(Number.isSafeInteger(gold) && gold === w.initialGold, 'gold conservation');
+  demand(Number.isFinite(gold) && Math.abs(gold - w.initialGold) <= 1e-9, 'gold conservation');
   for (const m of w.messages) {
     unique(m.id);
     demand(
@@ -739,6 +850,21 @@ export function validateCheckpoint(value: unknown): Checkpoint {
         }
         return true;
       });
+    }
+  }
+  if (w.controllerMode === 'composed') {
+    // Never discard custody to make an incompatible historical estate appear valid.
+    demand(Object.values(w.loot).every((l) => l.gold === 0 && Object.values(l.inventory).every((n) => n === 0)),
+      'composed restore contains legacy loot custody; explicit migration required');
+    demand(Object.values(w.citizens).every((c) => !c.emergency &&
+      ![c.action, ...c.queue.map((command) => ({ command }))].some((a) => a && ['loot', 'ally'].includes(a.command.type))),
+      'composed restore contains legacy activity; explicit cancellation required');
+    cancelLegacyBuildingOrders(w); // authoritative escrow refund, not reconstructed inventory
+    w.loot = {};
+    if (w.alliances) w.alliances = {};
+    if (w.claims) w.claims = {};
+    for (const c of Object.values(w.citizens)) {
+      delete c.autonomy;
     }
   }
   return cp;

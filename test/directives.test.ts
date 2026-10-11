@@ -316,7 +316,7 @@ describe('high-level directive execution', () => {
     expect(citizen.strategy?.status).toBe('blocked');
     expect(citizen.inventory['axe:1']).toBeUndefined();
   });
-  it('retains reproduction consent and counterpart prerequisites', () => {
+  it('retains per-parent T1 food prerequisites without consent', () => {
     const { world, citizen, commit, tick } = setup();
     const partner = {
       ...structuredClone(citizen),
@@ -328,8 +328,8 @@ describe('high-level directive execution', () => {
     };
     world.citizens.partner = partner;
     world.initialGold += partner.gold;
-    citizen.inventory['food:2'] = BALANCE.reproductionFood;
-    partner.inventory['food:2'] = BALANCE.reproductionFood;
+    citizen.inventory['food:1'] = BALANCE.reproductionFood;
+    partner.inventory['food:1'] = 0;
     updateKnowledge(world);
     commit({
       mode: 'replace',
@@ -338,8 +338,7 @@ describe('high-level directive execution', () => {
     tick(2);
     expect(citizen.strategy?.status).toBe('blocked');
     expect(Object.values(world.citizens)).toHaveLength(2);
-    citizen.consent.partner = world.tick + BALANCE.consentTicks;
-    partner.consent[citizen.id] = world.tick + BALANCE.consentTicks;
+    partner.inventory['food:1'] = BALANCE.reproductionFood;
     commit({
       mode: 'replace',
       directives: [{ type: 'reproduce', partnerId: 'partner', areas: [[1, 1, 2, 1]] }],

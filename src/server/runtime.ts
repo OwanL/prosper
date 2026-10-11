@@ -13,6 +13,7 @@ import {
   type RecordedTurn,
 } from '../citizen/index.ts';
 import { parseCommand } from '../citizen/tools.ts';
+import { composedCommandSchema } from './autonomy-checkpoint.ts';
 import { validateResponse } from '../citizen/provider.ts';
 import { dataDirectory, loadCheckpoint, saveCheckpoint, type Checkpoint } from './checkpoint.ts';
 import { projectSpectatorWorld } from './snapshot.ts';
@@ -23,7 +24,8 @@ import type { MotionSnapshot } from '../shared/motion-types.ts';
 
 export const controlSchema = z
   .object({
-    type: z.enum(['play', 'pause', 'step', 'speed', 'scenario', 'mode', 'checkpoint', 'reset']),
+    type: z.enum(['play', 'pause', 'step', 'speed', 'scenario', 'mode', 'checkpoint', 'reset', 'decision-tree-debug']),
+    enabled: z.boolean().optional(),
     ticks: z.number().int().min(1).max(10000).optional(),
     speed: z.number().min(0.1).max(100).optional(),
     scenario: z.enum(['village', 'competition', 'progression']).optional(),
@@ -31,6 +33,10 @@ export const controlSchema = z
     population: z.number().int().min(1).max(250).optional(),
   })
   .strict()
+  .refine(
+    (control) => control.type === 'decision-tree-debug' ? typeof control.enabled === 'boolean' : control.enabled === undefined,
+    'enabled is required only for decision-tree-debug.',
+  )
   .refine(
     (control) => control.population === undefined || ['scenario', 'reset'].includes(control.type),
     'population applies only to an explicit scenario or reset.',
@@ -44,6 +50,9 @@ export const budgetSchema = z
 export interface RuntimeOptions {
   /** New runs use the continuous local mind; explicit mechanics fixtures may opt out. */
   autonomy?: boolean;
+  /** Explicit legacy-controller creation for LLM/recorded fixtures; user-facing
+   * worlds always default to composed. Not advertised on the control API. */
+  legacy?: boolean;
   population?: number;
   directory?: string;
   checkpointPath?: string;
@@ -78,6 +87,7 @@ export class Runtime {
   runner: CitizenRunner;
   private running = false;
   private speed = 1;
+  private decisionTreeDebug = false;
   private state: 'ready' | 'reloading' | 'error' = 'ready';
   private error?: string;
   private diagnosticError?: string;
@@ -96,10 +106,12 @@ export class Runtime {
     this.checkpointPath = options.checkpointPath ?? join(this.directory, 'checkpoint.json');
     const cp = options.restore ? loadCheckpoint(this.checkpointPath) : undefined; // never substitute an empty world
     this.world = cp?.world ?? options.world ?? this.freshWorld();
+    if (!this.world.controllerMode) this.world.controllerMode = 'legacy'; // older untagged restores are explicitly legacy
     ensureTelemetry(this.world);
     updateKnowledge(this.world);
     this.running = cp?.runtime.running ?? false;
     this.speed = cp?.runtime.speed ?? 1;
+    this.decisionTreeDebug = cp?.runtime.decisionTreeDebug ?? false;
     this.commandSequence = cp?.runtime.commandSequence ?? 0;
     this.recorded = structuredClone(cp?.runtime.recorded ?? options.runner?.recorded ?? []);
     this.ledger =
@@ -118,11 +130,13 @@ export class Runtime {
       population ??
       this.options.population ??
       (process.env.PROSPER_POPULATION ? Number(process.env.PROSPER_POPULATION) : undefined);
+    // Native composed creation mints rest and mind shells; no post-creation assignment.
     const world = createWorld({
       scenario,
       seed,
       runId: `run-${randomUUID()}`,
-      autonomy: this.options.autonomy ?? true,
+      autonomy: false,
+      controllerMode: this.options.legacy ? 'legacy' : 'composed',
       population: configuredPopulation,
     });
     const citizens = Object.values(world.citizens);
@@ -132,7 +146,12 @@ export class Runtime {
     ensureTelemetry(world);
     return world;
   }
+  private requireSupportedMode(mode: AppSnapshot['status']['mode']): void {
+    if (this.world.controllerMode === 'composed' && mode !== 'scripted')
+      throw new Error('Composed worlds support Local AI only; live/recorded use the legacy controller.');
+  }
   private makeRunner(mode: AppSnapshot['status']['mode']): CitizenRunner {
+    this.requireSupportedMode(mode);
     const consumed = new Set<string>();
     const fixtures = this.recorded;
     return new CitizenRunner(
@@ -208,7 +227,8 @@ export class Runtime {
       tickWorld(this.world);
       updateKnowledge(this.world);
       this.log({ type: 'tick', order: this.commandSequence });
-      this.runner.tick(); // intentionally not awaited
+      // Core owns composed decisions; never invoke the legacy director/model runner.
+      if (this.world.controllerMode !== 'composed') this.runner.tick(); // intentionally not awaited
       const now = performance.now();
       this.motionTickMs = Math.max(1, now - this.lastMotionTickAt);
       this.lastMotionTickAt = now;
@@ -238,7 +258,8 @@ export class Runtime {
     return result;
   }
   command(citizenId: string, value: unknown): CommandResult {
-    return this.apply(citizenId, parseCommand(value), 'browser');
+    const composed = composedCommandSchema.safeParse(value);
+    return this.apply(citizenId, composed.success ? composed.data : parseCommand(value), 'browser');
   }
   observation(citizenId: string) {
     if (!this.world.citizens[citizenId]) throw new Error('Unknown citizen.');
@@ -315,12 +336,13 @@ export class Runtime {
         outputTokens: record.outputTokens,
       }));
     return {
-      world: projectSpectatorWorld(this.world),
+      world: projectSpectatorWorld(this.world, this.decisionTreeDebug),
       status: {
         ...status,
         planner: this.runner.metrics(),
         running: this.running,
         speed: this.speed,
+        decisionTreeDebug: this.decisionTreeDebug,
         state: this.state,
         ...(error ? { error } : {}),
       },
@@ -342,6 +364,10 @@ export class Runtime {
       return this.snapshot();
     }
     this.available();
+    if (control.type === 'decision-tree-debug') {
+      this.decisionTreeDebug = control.enabled!;
+      return this.snapshot();
+    }
     switch (control.type) {
       case 'play':
         this.running = true;
@@ -381,6 +407,7 @@ export class Runtime {
         if (!control.mode) throw new Error('mode is required.');
         if (control.mode === 'recorded' && !this.recorded.length)
           throw new Error('Import recorded fixtures explicitly before selecting recorded mode.');
+        this.requireSupportedMode(control.mode);
         this.runner.setMode(control.mode);
         break;
     }
@@ -401,6 +428,7 @@ export class Runtime {
       world: structuredClone(this.world),
       runtime: {
         running: false,
+        decisionTreeDebug: this.decisionTreeDebug,
         speed: this.speed,
         mode,
         commandSequence: this.commandSequence,
@@ -422,7 +450,7 @@ export class Runtime {
       population ?? this.world.initialGold / BALANCE.startingGold,
     );
     updateKnowledge(nextWorld);
-    const nextMode = mode === 'recorded' ? 'scripted' : mode;
+    const nextMode = 'scripted' as const;
     const archivePath = join(this.directory, 'checkpoints', `before-reset-${randomUUID()}.json`);
     const writer = this.options.checkpointWriter ?? saveCheckpoint;
     try {
@@ -446,6 +474,7 @@ export class Runtime {
   }
   importFixtures(value: unknown): AppSnapshot {
     this.available();
+    this.requireSupportedMode('recorded');
     const recorded = parseFixtures(value);
     if (recorded.some((f) => !this.world.citizens[f.citizenId]))
       throw new Error('Fixture refers to an unknown citizen in this world.');
@@ -479,6 +508,7 @@ export class Runtime {
         world: structuredClone(this.world),
         runtime: {
           running,
+          decisionTreeDebug: this.decisionTreeDebug,
           speed: this.speed,
           mode: this.runner.status().mode,
           commandSequence: this.commandSequence,

@@ -404,7 +404,6 @@ describe('fresh citizen runner', () => {
     const context = freshContext(observation);
     expect(JSON.parse(context[1].content!).ownState).toMatchObject({
       parents: citizen.parents,
-      consent: { ally: 40 },
       reproductionCooldown: 80,
     });
     expect(context[0].content).toContain('information is dated, not remote truth');

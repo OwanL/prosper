@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import type { AppSnapshot, Control } from '../../src/shared/types';
+import type { Control } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import {
   HISTORY_CADENCE,
   HISTORY_LIMIT,
@@ -52,6 +53,7 @@ function fixture(): AppSnapshot {
   return {
     world,
     status: {
+      decisionTreeDebug: false,
       state: 'ready',
       running: false,
       speed: 1,
@@ -142,7 +144,7 @@ async function mockApi(page: Page): Promise<ApiMock> {
       mock.gets.push(path);
       if (path === '/api/state') {
         await route.fulfill(
-          mock.stateError ? { status: 503, body: 'Fixture offline' } : { json: mock.snapshot },
+          mock.stateError ? { status: 503, body: 'Fixture offline' } : { json: spectatorFixture(mock.snapshot) },
         );
         return;
       }
@@ -181,7 +183,7 @@ async function mockApi(page: Page): Promise<ApiMock> {
         const command = body as Control;
         if (command.type === 'mode' && command.mode) {
           mock.snapshot.status.mode = command.mode;
-          await route.fulfill({ json: mock.snapshot });
+          await route.fulfill({ json: spectatorFixture(mock.snapshot) });
           return;
         }
         if (command.type === 'reset') {
@@ -194,7 +196,7 @@ async function mockApi(page: Page): Promise<ApiMock> {
           mock.snapshot.status.running = false;
           mock.snapshot.status.mode = 'scripted';
           mock.snapshot.turns = [];
-          await route.fulfill({ json: mock.snapshot });
+          await route.fulfill({ json: spectatorFixture(mock.snapshot) });
           return;
         }
       }
@@ -291,8 +293,9 @@ test('Citizens search and selection open Now, Motivation and retained citizen Hi
   await page.getByLabel('Find citizens').fill('missing fixture');
   await expect(roster).toContainText('No citizens match your search.');
   await page.getByLabel('Find citizens').fill('Ada Fixture');
-  await expect(roster.getByRole('button')).toHaveCount(1);
-  await roster.getByRole('button').click();
+  const matchingCitizen = roster.locator('.roster-list > li').filter({ hasText: 'Ada Fixture' });
+  await expect(matchingCitizen).toHaveCount(1);
+  await matchingCitizen.getByRole('button', { name: /Ada Fixture/ }).click();
   const details = page.getByRole('region', { name: 'Citizen details' });
   await expect(details.getByRole('tab', { name: 'Now', exact: true })).toHaveAttribute(
     'aria-selected',

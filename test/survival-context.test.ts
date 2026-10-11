@@ -21,11 +21,12 @@ describe('dated own-state survival context', () => {
     citizen.health = 70.4;
     const food = planningContext(observe(world, citizen.id)).food;
     expect(food.snapshotTick).toBe(2592);
-    expect(food.availableFoodRunwayTicks).toBe(22);
-    expect(food.hungerOnsetTicks).toBe(22);
+    const hungerTicks = Math.floor(citizen.fullness / BALANCE.fullnessDrain);
+    expect(food.availableFoodRunwayTicks).toBe(hungerTicks);
+    expect(food.hungerOnsetTicks).toBe(hungerTicks);
     expect(food.starvationDamagePerTick).toBe(BALANCE.starvationDamage);
     expect(food.starvationTicksAtCurrentHealth).toBeCloseTo(352);
-    expect(food.approximateUnassistedDeathHorizonTicks).toBeCloseTo(374);
+    expect(food.approximateUnassistedDeathHorizonTicks).toBeCloseTo(hungerTicks + citizen.health / BALANCE.starvationDamage);
     citizen.fullness = 0;
     citizen.health = 39;
     const starving = planningContext(observe(world, citizen.id)).food;

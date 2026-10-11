@@ -132,9 +132,8 @@ export function commitStrategy(
     }
     if (directive.type === 'reproduce') {
       const gate = validateKnownCommand(world, citizenId, {
-        type: 'consent',
+        type: 'reproduce',
         partnerId: directive.partnerId,
-        accept: true,
       });
       if (!gate.ok) return gate;
     }

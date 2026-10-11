@@ -101,11 +101,12 @@ describe('spectator historical API and persistence', () => {
       (cp) => { cp.world.telemetry!.frames = Array.from({ length: HISTORY_LIMIT + 1 }, () => structuredClone(cp.world.telemetry!.frames[0])); },
       (cp) => { cp.world.telemetry!.frames[0].citizens.unknown = cp.world.telemetry!.frames[0].citizens[id]; },
       (cp) => { cp.world.telemetry!.frames[0].citizens[id].cash = -1; },
-      (cp) => { cp.world.telemetry!.frames[0].citizens[id].escrow = 0.5; },
+      // Fractional cash/units are legitimate after the fractional economy; corruption is non-finite values.
+      (cp) => { cp.world.telemetry!.frames[0].citizens[id].escrow = Number.NaN; },
       (cp) => { cp.world.telemetry!.pending['building:station'] = { units: 1, turnover: 1, fills: 1 }; },
       (cp) => { cp.world.telemetry!.pending['food:1'] = { units: -1, turnover: 1, fills: 1 }; },
       (cp) => { cp.world.telemetry!.pending['food:1'] = { units: 1, turnover: 1, fills: 0.5 }; },
-      (cp) => { cp.world.telemetry!.frames[0].markets['food:1'].units = 0.5; },
+      (cp) => { cp.world.telemetry!.frames[0].markets['food:1'].units = Number.POSITIVE_INFINITY; },
       (cp) => { cp.world.telemetry!.frames[0].markets['food:1'].lastPrice = 1; },
       (cp) => {
         const market = cp.world.telemetry!.frames[0].markets['food:1'];

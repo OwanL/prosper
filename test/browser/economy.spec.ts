@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createWorld, dispatch } from '../../src/world/core';
 import { enableAutonomy } from '../../src/world/autonomy';
 import { claimTerritory, formAlliance } from '../../src/world/society';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 
 const visuals = mkdtempSync(join(tmpdir(), 'prosper-economy-mocked-visuals-'));
 
@@ -14,7 +14,7 @@ async function mount(page: Page, snapshot: AppSnapshot) {
   await page.route('**/api/**', async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === 'GET' && path === '/api/state') await route.fulfill({ json: snapshot });
+    if (request.method() === 'GET' && path === '/api/state') await route.fulfill({ json: spectatorFixture(snapshot) });
     else if (request.method() === 'GET' && path === '/api/history/global') {
       await route.fulfill({ json: { runId: snapshot.world.runId, tick: snapshot.world.tick, startedTick: 0, cadence: 20, limit: 256, frames: [] } });
     } else {
@@ -34,7 +34,7 @@ test('offline economy lives in the Market dock, with disclosures and read-only f
   expect(dispatch(world, seller.id, { type: 'order', side: 'sell', item: 'food:1', quantity: 1, price: 5 }).ok).toBe(true);
   const unexpected = await mount(page, {
     world,
-    status: { state: 'ready', running: false, speed: 1, mode: 'scripted', generation: 1, thinking: [] },
+    status: { decisionTreeDebug: false, state: 'ready', running: false, speed: 1, mode: 'scripted', generation: 1, thinking: [] },
     budget: { requests: 0, pending: 0, spent: 0, limit: 100, tokens: 0, maxTokens: 100000, unit: 'requests' },
     turns: [],
   });
@@ -93,6 +93,7 @@ test('scoped mock: 100 citizens, shared rival territory, active pursuit and pers
   const snapshot: AppSnapshot = {
     world,
     status: {
+      decisionTreeDebug: false,
       state: 'ready',
       running: false,
       speed: 1,

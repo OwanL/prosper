@@ -1,24 +1,24 @@
-import type { Citizen, Command, CommandResult, Order, World } from '../shared/types.ts';
+import type { Command, CommandResult, Order, World } from '../shared/types.ts';
 import { addInventory, event, fail, id, ok, takeInventory } from '../shared/utils.ts';
-import { CARRIED_ITEM_RE } from '../shared/tiers.ts';
+import { CARRIED_ITEM_RE, EQUIPMENT_ITEM_RE } from '../shared/tiers.ts';
 import { ensureTelemetry, recordTelemetryFill } from './telemetry.ts';
 
+// Currency arithmetic may leave a negative residual after fractional fills.
+// Never relax funding checks or round positive balances: that could mint money.
+const currencyRoundoff = (value: number) => value < 0 && value >= -1e-9 ? 0 : value;
 const tradableItem = CARRIED_ITEM_RE;
 const positiveInteger = (n: number) => Number.isSafeInteger(n) && n > 0;
 const buildingIdFor = (item: string) => (item.startsWith('building:') ? item.slice(9) : null);
 
-/** A listed building stays attackable, but core must prohibit starting/continuing work. */
-export function isBuildingListed(world: World, buildingId: string): boolean {
-  return Object.values(world.orders).some(
-    (order) => order.side === 'sell' && order.item === `building:${buildingId}`,
-  );
-}
+/** Building listings are compatibility data only, never active market behavior. */
+export function isBuildingListed(_world: World, _buildingId: string): boolean { return false; }
 
 function cancelOrder(world: World, order: Order): void {
   const citizen = world.citizens[order.citizenId];
   // Refund even to a dead citizen: the death dispatcher collects these holdings next.
   if (citizen) {
-    citizen.gold += order.escrowGold;
+    order.escrowGold = currencyRoundoff(order.escrowGold);
+    citizen.gold = currencyRoundoff(currencyRoundoff(citizen.gold) + order.escrowGold);
     addInventory(citizen.inventory, order.escrowItems);
   }
   delete world.orders[order.id];
@@ -36,26 +36,19 @@ export function cancelBuildingOrders(world: World, buildingId: string): void {
   }
 }
 
-function processing(citizen: Citizen, buildingId: string): boolean {
-  const command = citizen.action?.command;
-  return command?.type === 'refine' && command.buildingId === buildingId;
+/** Restore owners should call this before exposing a historical checkpoint. */
+export function cancelLegacyBuildingOrders(world: World): void {
+  for (const order of Object.values(world.orders)) {
+    if (buildingIdFor(order.item) !== null) cancelOrder(world, order);
+  }
 }
 
 function validOrder(world: World, order: Order): boolean {
   const citizen = world.citizens[order.citizenId];
-  if (!citizen?.alive || citizen.health <= 0) return false;
-  const buildingId = buildingIdFor(order.item);
-  if (buildingId === null) return true;
-  const building = world.buildings[buildingId];
-  return (
-    !!building &&
-    building.health > 0 &&
-    (order.side === 'buy' ||
-      (building.ownerId === order.citizenId && !processing(citizen, buildingId)))
-  );
+  return !!citizen?.alive && citizen.health > 0 && buildingIdFor(order.item) === null;
 }
 
-function match(world: World, incoming: Order): number {
+function match(world: World, incoming: Order, delivery?: (order: Order, quantity: number) => void): number {
   let settledGold = 0;
   const candidates = Object.values(world.orders)
     .filter(
@@ -87,16 +80,12 @@ function match(world: World, incoming: Order): number {
     const price = resting.price;
     const buyer = world.citizens[buy.citizenId];
     const seller = world.citizens[sell.citizenId];
-    const buildingId = buildingIdFor(incoming.item);
-    if (buildingId !== null) {
-      world.buildings[buildingId].ownerId = buyer.id;
-    } else {
-      takeInventory(sell.escrowItems, { [sell.item]: quantity });
-      addInventory(buyer.inventory, { [sell.item]: quantity });
-    }
-    buy.escrowGold -= quantity * buy.price;
-    buyer.gold += quantity * (buy.price - price);
-    seller.gold += quantity * price;
+    takeInventory(sell.escrowItems, { [sell.item]: quantity });
+    addInventory(buyer.inventory, { [sell.item]: quantity });
+    delivery?.(buy, quantity);
+    buy.escrowGold = currencyRoundoff(buy.escrowGold - quantity * buy.price);
+    buyer.gold = currencyRoundoff(currencyRoundoff(buyer.gold) + quantity * (buy.price - price));
+    seller.gold = currencyRoundoff(currencyRoundoff(seller.gold) + quantity * price);
     settledGold += quantity * price;
     buy.quantity -= quantity;
     sell.quantity -= quantity;
@@ -105,10 +94,20 @@ function match(world: World, incoming: Order): number {
       citizenId: buyer.id,
       targetId: seller.id,
       audience: [buyer.id, seller.id],
+      trade: {
+        buyOrderId: buy.id,
+        sellOrderId: sell.id,
+        item: incoming.item,
+        quantity,
+        price,
+        buyerId: buyer.id,
+        sellerId: seller.id,
+      },
     });
-    if (!resting.quantity) delete world.orders[resting.id];
+    // Return any floating-point escrow remainder rather than dropping it on completion.
+    if (!resting.quantity) cancelOrder(world, resting);
     if (!incoming.quantity) {
-      delete world.orders[incoming.id];
+      cancelOrder(world, incoming);
       break;
     }
   }
@@ -116,7 +115,8 @@ function match(world: World, incoming: Order): number {
 }
 
 /** Caller serializes this synchronous transaction with ticks and all other commands. */
-export function marketCommand(world: World, citizenId: string, command: Command): CommandResult {
+export function marketCommand(world: World, citizenId: string, command: Command, delivery?: (order: Order, quantity: number) => void, requestId?: string | null): CommandResult {
+  cancelLegacyBuildingOrders(world);
   const citizen = world.citizens[citizenId];
   if (!citizen?.alive || citizen.health <= 0)
     return fail('unavailable-citizen', 'A living citizen is required.');
@@ -129,11 +129,11 @@ export function marketCommand(world: World, citizenId: string, command: Command)
     if (citizen.gold < command.gold)
       return fail('insufficient-gold', 'Not enough unreserved gold.');
     if (citizen.id !== recipient.id) {
-      if (!Number.isSafeInteger(recipient.gold + command.gold))
+      if ((!Number.isFinite(recipient.gold + command.gold) || recipient.gold + command.gold > Number.MAX_SAFE_INTEGER))
         return fail('invalid-gold', 'Recipient balance would exceed the integer limit.');
       ensureTelemetry(world);
-      citizen.gold -= command.gold;
-      recipient.gold += command.gold;
+      citizen.gold = currencyRoundoff(citizen.gold - command.gold);
+      recipient.gold = currencyRoundoff(currencyRoundoff(recipient.gold) + command.gold);
     }
     return ok(`Transferred ${command.gold} gold to ${recipient.id}.`);
   }
@@ -148,40 +148,26 @@ export function marketCommand(world: World, citizenId: string, command: Command)
   if (command.type !== 'order') return fail('unsupported-command', 'Not a market command.');
   if (command.side !== 'buy' && command.side !== 'sell')
     return fail('invalid-side', 'Order side must be buy or sell.');
-  if (
-    !positiveInteger(command.quantity) ||
-    !positiveInteger(command.price) ||
-    !Number.isSafeInteger(command.quantity * command.price)
-  ) {
-    return fail(
-      'invalid-order',
-      'Quantity and unit price must be positive whole safe integers, with a safe total.',
-    );
-  }
   if (typeof command.item !== 'string')
-    return fail('invalid-item', 'Choose an exact item and tier or building:<id>.');
-  const buildingId = buildingIdFor(command.item);
-  if (buildingId === null && !tradableItem.test(command.item))
+    return fail('invalid-item', 'Choose an exact commodity or tool and tier.');
+  if (buildingIdFor(command.item) !== null)
+    return fail('building-trading-disabled', 'Buildings cannot be bought or sold.');
+  if (!tradableItem.test(command.item))
     return fail('invalid-item', 'Unknown item or tier.');
-  if (buildingId !== null) {
-    const building = world.buildings[buildingId];
-    if (!building || building.health <= 0)
-      return fail('unavailable-building', 'Building does not exist or is destroyed.');
-    if (command.quantity !== 1)
-      return fail('invalid-quantity', 'A building is unique; quantity must be one.');
-    if (command.side === 'sell') {
-      if (building.ownerId !== citizenId)
-        return fail('not-owner', 'Only the owner can sell a building.');
-      if (isBuildingListed(world, buildingId))
-        return fail('already-listed', 'Cancel the existing listing before replacing it.');
-      if (processing(citizen, buildingId))
-        return fail('building-busy', 'Cancel active processing before listing the building.');
-    }
+  if (
+    !Number.isFinite(command.quantity) || command.quantity <= 0 ||
+    command.quantity > Number.MAX_SAFE_INTEGER ||
+    (EQUIPMENT_ITEM_RE.test(command.item) && !positiveInteger(command.quantity)) ||
+    !positiveInteger(command.price) ||
+    !Number.isFinite(command.quantity * command.price) ||
+    command.quantity * command.price > Number.MAX_SAFE_INTEGER
+  ) {
+    return fail('invalid-order', 'Quantity must be positive and finite (whole for tools); unit price must be a positive whole safe integer, with a safe total.');
   }
   const total = command.quantity * command.price;
   if (command.side === 'buy' && citizen.gold < total)
     return fail('insufficient-gold', 'Not enough unreserved gold.');
-  if (command.side === 'sell' && buildingId === null) {
+  if (command.side === 'sell') {
     // Work inputs are already removed into Action.reserved by core; carried tools are saleable.
     if ((citizen.inventory[command.item] ?? 0) < command.quantity) {
       return fail('insufficient-items', 'Not enough unreserved copies.');
@@ -190,6 +176,7 @@ export function marketCommand(world: World, citizenId: string, command: Command)
   ensureTelemetry(world);
   const sequence = world.nextId;
   const order: Order = {
+    ...(requestId !== undefined ? { requestId } : {}),
     id: id(world, 'order'),
     citizenId,
     side: command.side,
@@ -200,12 +187,12 @@ export function marketCommand(world: World, citizenId: string, command: Command)
     sequence,
     escrowGold: command.side === 'buy' ? total : 0,
     escrowItems:
-      command.side === 'sell' && buildingId === null ? { [command.item]: command.quantity } : {},
+      command.side === 'sell' ? { [command.item]: command.quantity } : {},
   };
-  if (command.side === 'buy') citizen.gold -= total;
+  if (command.side === 'buy') citizen.gold = currencyRoundoff(citizen.gold - total);
   else takeInventory(citizen.inventory, order.escrowItems);
   world.orders[order.id] = order;
-  const settledGold = match(world, order);
+  const settledGold = match(world, order, delivery);
   const filledQuantity = command.quantity - order.quantity;
   return {
     ...ok(

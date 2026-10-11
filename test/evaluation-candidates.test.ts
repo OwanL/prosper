@@ -50,6 +50,24 @@ describe('strict primitive decoder', () => {
     expect(decode(JSON.stringify(value))).toEqual(value);
     expect(primitiveCommandSchema.parse(command)).toEqual(commandSchema.parse(command));
   });
+  it.each(['buy', 'sell'] as const)('accepts fractional commodity %s orders unchanged', (side) => {
+    const value = { requestId: 'r1', kind: 'command', command: {
+      type: 'order', side, item: 'food:1', quantity: 0.25, price: 3,
+    } };
+    expect(decode(JSON.stringify(value))).toEqual(value);
+  });
+  it.each([
+    { type: 'order', side: 'sell', item: 'axe:1', quantity: 0.25, price: 1 },
+    { type: 'order', side: 'buy', item: 'building:legacy-id', quantity: 1, price: 1 },
+    { type: 'order', side: 'sell', item: 'food:1', quantity: Number.MAX_SAFE_INTEGER, price: 2 },
+    { type: 'order', side: 'buy', item: 'food:1', quantity: Infinity, price: 1 },
+    { type: 'order', side: 'buy', item: 'food:1', quantity: NaN, price: 1 },
+    { type: 'give', citizenId: 'known-person', item: 'food:1', quantity: 0.25 },
+    { type: 'transfer', citizenId: 'known-person', gold: 0.25 },
+  ])('retains non-schema runtime bounds and other command integers %#', (command) => {
+    expect(commandSchema.safeParse(command).success).toBe(false);
+    expect(() => decode({ requestId: 'r1', kind: 'command', command })).toThrow('Invalid primitive decision structure.');
+  });
   it('accepts no-command and does not insert a Command', () => {
     expect(decode({ requestId: 'r1', kind: 'advance' })).toEqual({ requestId: 'r1', kind: 'advance' });
   });

@@ -38,11 +38,9 @@ function building(world: World, owner: Citizen, overrides: Partial<Building> = {
   world.buildings[result.id] = result;
   return result;
 }
-function consenting(world: World, a: Citizen, b: Citizen) {
-  a.inventory['food:2'] = BALANCE.reproductionFood;
-  b.inventory['food:2'] = BALANCE.reproductionFood;
-  send(world, a, { type: 'consent', partnerId: b.id, accept: true });
-  send(world, b, { type: 'consent', partnerId: a.id, accept: true });
+function provisionParents(_world: World, a: Citizen, b: Citizen) {
+  a.inventory['food:1'] = BALANCE.reproductionFood;
+  b.inventory['food:1'] = BALANCE.reproductionFood;
 }
 function totalGold(world: World) {
   return (
@@ -188,27 +186,20 @@ describe('combat and property', () => {
     c.x = 20;
     c.y = 20;
     const station = building(world, c, { health: 10 });
-    send(world, c, {
-      type: 'order',
-      side: 'sell',
-      item: `building:${station.id}`,
-      quantity: 1,
-      price: 20,
-    });
-    send(world, b, {
-      type: 'order',
-      side: 'buy',
-      item: `building:${station.id}`,
-      quantity: 1,
-      price: 10,
-    });
+    // Premise migration: station trading is intentionally excluded, so market
+    // escrow can never hold a demolition target; these assertions pin that.
+    expect(
+      dispatch(world, c.id, { type: 'order', side: 'sell', item: `building:${station.id}`, quantity: 1, price: 20 }).code,
+    ).toBe('building-trading-disabled');
+    expect(
+      dispatch(world, b.id, { type: 'order', side: 'buy', item: `building:${station.id}`, quantity: 1, price: 10 }).code,
+    ).toBe('building-trading-disabled');
+    expect(world.orders).toEqual({});
     a.inventory['sword:3'] = 1;
     send(world, a, { type: 'attack', targetId: station.id });
     expect(a.inventory['wood:1']).toBeUndefined();
     tickWorld(world, 8);
     expect(world.buildings[station.id]).toBeUndefined();
-    expect(world.orders).toEqual({});
-    expect(b.gold).toBe(100);
     expect(a.inventory).toMatchObject({ 'wood:1': 4, 'fibre:1': 3 });
     const alert = world.events.find((e) => e.kind === 'attack')!;
     expect(alert).toMatchObject({ citizenId: a.id, targetId: station.id, x: 2, y: 1 });
@@ -323,17 +314,13 @@ describe('death and bodies', () => {
 });
 
 describe('joint reproduction and command interaction', () => {
-  it('requires authoritative mutual consent, adjacency, per-parent food, health and cooldown', () => {
+  it('requires adjacency, per-parent food, health and cooldown', () => {
     const { world, a, b } = fixture();
     send(world, a, { type: 'message', text: 'I consent', to: b.id });
     expect(dispatch(world, a.id, { type: 'reproduce', partnerId: b.id }).code).toBe(
-      'consent-required',
+      'parent-food',
     );
-    send(world, a, { type: 'consent', partnerId: b.id, accept: true });
-    expect(dispatch(world, a.id, { type: 'reproduce', partnerId: b.id }).code).toBe(
-      'consent-required',
-    );
-    consenting(world, a, b);
+    provisionParents(world, a, b);
     b.x = 3;
     expect(dispatch(world, a.id, { type: 'reproduce', partnerId: b.id }).code).toBe('not-adjacent');
     b.x = 2;
@@ -347,21 +334,21 @@ describe('joint reproduction and command interaction', () => {
       'parent-cooldown',
     );
     b.reproductionCooldown = 0;
-    b.inventory = { 'food:1': 100 };
+    b.inventory = { 'food:2': 100 };
     expect(dispatch(world, a.id, { type: 'reproduce', partnerId: b.id }).code).toBe('parent-food');
     expect(a.action).toBeNull();
-    expect(a.inventory['food:2']).toBe(3);
+    expect(a.inventory['food:1']).toBe(1);
   });
 
   it('occupies both parents, consumes once and creates an individual adult without minting holdings', () => {
     const { world, a, b } = fixture();
-    consenting(world, a, b);
+    provisionParents(world, a, b);
     send(world, a, { type: 'reproduce', partnerId: b.id });
     expect(a.action?.id).toBe(b.action?.id);
     expect(a.inventory).toEqual({});
     expect(b.inventory).toEqual({});
-    expect(a.action?.reserved).toEqual({ 'food:2': 3 });
-    expect(b.action?.reserved).toEqual({ 'food:2': 3 });
+    expect(a.action?.reserved).toEqual({ 'food:1': 1 });
+    expect(b.action?.reserved).toEqual({ 'food:1': 1 });
     const restored: World = JSON.parse(JSON.stringify(world));
     tickWorld(world, BALANCE.reproductionTicks - 1);
     tickWorld(restored, BALANCE.reproductionTicks - 1);
@@ -390,7 +377,7 @@ describe('joint reproduction and command interaction', () => {
     expect(a.reproductionCooldown).toBe(world.tick + BALANCE.reproductionCooldown);
     expect(b.reproductionCooldown).toBe(a.reproductionCooldown);
     expect(totalGold(world)).toBe(world.initialGold);
-    expect(a.inventory['food:2']).toBeUndefined();
+    expect(a.inventory['food:1']).toBeUndefined();
     send(world, child, { type: 'move', x: 1, y: 2 });
     tickWorld(world, 2);
     expect(child.y).toBe(2);
@@ -400,7 +387,7 @@ describe('joint reproduction and command interaction', () => {
 
   it('rejects busy partners without cancelling either existing physical action', () => {
     const { world, a, b } = fixture();
-    consenting(world, a, b);
+    provisionParents(world, a, b);
     send(world, b, { type: 'move', x: 5, y: 1 });
     send(world, a, { type: 'move', x: 4, y: 1 });
     const actionId = a.action!.id;
@@ -409,10 +396,10 @@ describe('joint reproduction and command interaction', () => {
     expect(b.action?.command.type).toBe('move');
   });
 
-  it('returns both reservations on cancel/replace/revoke, while append waits without breaking joint work', () => {
-    for (const mode of ['cancel', 'replace', 'revoke'] as const) {
+  it('returns both reservations on cancel/replace, while append waits without breaking joint work', () => {
+    for (const mode of ['cancel', 'replace'] as const) {
       const { world, a, b } = fixture();
-      consenting(world, a, b);
+      provisionParents(world, a, b);
       send(world, a, { type: 'reproduce', partnerId: b.id });
       tickWorld(world, 3);
       send(world, b, { type: 'move', x: 3, y: 1, queue: 'append' });
@@ -420,13 +407,12 @@ describe('joint reproduction and command interaction', () => {
       expect(b.queue).toHaveLength(1);
       if (mode === 'cancel') send(world, a, { type: 'cancel' });
       if (mode === 'replace') send(world, a, { type: 'move', x: 1, y: 2 });
-      if (mode === 'revoke') send(world, a, { type: 'consent', partnerId: b.id, accept: false });
       expect(b.action).toBeNull();
-      expect(a.inventory['food:2']).toBe(3);
-      expect(b.inventory['food:2']).toBe(3);
+      expect(a.inventory['food:1']).toBe(1);
+      expect(b.inventory['food:1']).toBe(1);
       cancelAction(world, a.id);
-      expect(a.inventory['food:2']).toBe(3);
-      expect(b.inventory['food:2']).toBe(3);
+      expect(a.inventory['food:1']).toBe(1);
+      expect(b.inventory['food:1']).toBe(1);
       expect(a.reproductionCooldown).toBe(0);
       tickWorld(world, 4);
       expect(b.x).toBe(3);
@@ -436,7 +422,7 @@ describe('joint reproduction and command interaction', () => {
 
   it('refunds joint work before a parents death holdings settle; partner food is not stolen', () => {
     const { world, a, b, c } = fixture();
-    consenting(world, a, b);
+    provisionParents(world, a, b);
     send(world, a, { type: 'reproduce', partnerId: b.id });
     a.health = 1;
     send(world, c, { type: 'attack', targetId: a.id });
@@ -444,29 +430,25 @@ describe('joint reproduction and command interaction', () => {
     tickWorld(world);
     expect(a.alive).toBe(false);
     expect(b.action).toBeNull();
-    expect(b.inventory['food:2']).toBe(3);
-    expect(c.inventory['food:2']).toBe(3);
+    expect(b.inventory['food:1']).toBe(1);
+    expect(c.inventory['food:1']).toBe(1);
     expect(c.gold).toBe(200);
     expect(Object.values(world.citizens)).toHaveLength(3);
     expect(totalGold(world)).toBe(world.initialGold);
   });
 
-  it('cancels if joint prerequisites disappear or consent expires', () => {
-    for (const cause of ['health', 'adjacency', 'expiry'] as const) {
+  it('cancels if joint prerequisites disappear', () => {
+    for (const cause of ['health', 'adjacency'] as const) {
       const { world, a, b } = fixture();
-      consenting(world, a, b);
-      if (cause === 'expiry') {
-        a.consent[b.id] = 2;
-        b.consent[a.id] = 2;
-      }
+      provisionParents(world, a, b);
       send(world, a, { type: 'reproduce', partnerId: b.id });
       if (cause === 'health') b.health = 70;
       if (cause === 'adjacency') b.x = 5;
       tickWorld(world, 2);
       expect(a.action).toBeNull();
       expect(b.action).toBeNull();
-      expect(a.inventory['food:2']).toBe(3);
-      expect(b.inventory['food:2']).toBe(3);
+      expect(a.inventory['food:1']).toBe(1);
+      expect(b.inventory['food:1']).toBe(1);
     }
   });
 
@@ -483,7 +465,7 @@ describe('joint reproduction and command interaction', () => {
         partnerId: b.id,
         accept: 'yes',
       } as unknown as Command).code,
-    ).toBe('invalid-consent');
+    ).toBe('unsupported-command');
     expect(dispatch(world, a.id, { type: 'reproduce', partnerId: a.id }).code).toBe(
       'invalid-partner',
     );

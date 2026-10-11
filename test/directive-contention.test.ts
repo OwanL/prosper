@@ -52,18 +52,24 @@ function setup() {
 }
 
 describe('directive deposit contention', () => {
-  it('keeps reservation retries inspectable without waking reviews and progresses after local regrowth', () => {
+  it('keeps completion-race retries inspectable without waking reviews and progresses after local regrowth', () => {
     const { world, first, second, commit, tick } = setup();
     commit(first);
     commit(second);
     tick();
     expect(first.action?.command).toEqual({ type: 'harvest', depositId: 'wood' });
+    expect(second.action?.command).toEqual({ type: 'harvest', depositId: 'wood' });
+    expect(world.deposits.wood.stock).toBe(1);
+    tick(BALANCE.harvestTicks);
+    expect(first.inventory['wood:1']).toBe(1);
+    expect(second.inventory['wood:1'] ?? 0).toBe(0);
+    expect(world.deposits.wood.stock).toBe(0);
     expect(second.action).toBeNull();
     expect(second.strategy?.wakeTick).toBeGreaterThan(world.tick);
-    expect(second.lastResult).toContain('depleted or reserved');
+    expect(second.lastResult).toContain('depleted');
     expect(
       world.events.some(
-        (e) => e.citizenId === second.id && e.text.includes('depleted or reserved'),
+        (e) => e.citizenId === second.id && e.text.includes('depleted'),
       ),
     ).toBe(true);
     expect(reviewReason(world, second)).toBeUndefined();
@@ -79,18 +85,21 @@ describe('directive deposit contention', () => {
   });
 
   it('does not wake for depletion of an already pending directive harvest', () => {
-    const { world, first, commit, tick } = setup();
+    const { world, first, second, commit, tick } = setup();
+    // Starting first lets the competitor finish before the pending directive.
+    expect(dispatch(world, second.id, { type: 'harvest', depositId: 'wood' }).ok).toBe(true);
     commit(first);
     tick();
-    // A restored/changed prerequisite must use the same retry classification as activation.
-    world.deposits.wood.stock = 0;
-    world.deposits.wood.regrowAt = world.tick + 5;
-    tick();
+    expect(first.action?.command.type).toBe('harvest');
+    tick(BALANCE.harvestTicks);
+    expect(second.inventory['wood:1']).toBe(1);
+    expect(first.inventory['wood:1'] ?? 0).toBe(0);
+    expect(world.deposits.wood.stock).toBe(0);
     expect(first.strategy?.status).toBe('active');
     expect(first.strategy?.wakeTick).toBeGreaterThan(world.tick);
     expect(reviewReason(world, first)).toBeUndefined();
-    expect(first.lastResult).toContain('depleted or reserved');
-    tick(5 + BALANCE.harvestTicks + BALANCE.moveTicks);
+    expect(first.lastResult).toContain('depleted');
+    tick(BALANCE.regrowTicks + BALANCE.harvestTicks + BALANCE.moveTicks);
     expect(first.inventory['wood:1']).toBe(1);
     expect(first.strategy?.status).toBe('completed');
   });
@@ -136,6 +145,9 @@ describe('directive deposit contention', () => {
       commit(first);
       commit(second);
       tick();
+      tick(BALANCE.harvestTicks);
+      expect(world.deposits.wood.stock).toBe(0);
+      expect(second.strategy?.status).toBe('active');
       second.review = reviewState(world, second);
       expect(
         dispatch(world, second.id, { type: 'harvest', depositId: 'wood' }, source),

@@ -41,7 +41,8 @@ describe('explicit world reset', () => {
     const before = runtime.snapshot();
     const ledger = readFileSync(join(directory, 'request-ledger.jsonl'), 'utf8');
     const reset = runtime.control({ type: 'reset' });
-    expect(reset.status).toMatchObject({ running: false, mode: 'live', state: 'ready' });
+    // Fresh reset worlds are composed Local AI, so an explicit legacy live session returns to scripted.
+    expect(reset.status).toMatchObject({ running: false, mode: 'scripted', state: 'ready' });
     expect(reset.world.runId).not.toBe(before.world.runId);
     expect(reset.world.seed).not.toBe(before.world.seed);
     expect(reset.world.tick).toBe(0);
@@ -78,7 +79,7 @@ describe('explicit world reset', () => {
     const response = new Promise<any>((resolve) => {
       finish = resolve;
     });
-    const { runtime, directory } = setup({ runner: { mode: 'live', transport: () => response } });
+    const { runtime, directory } = setup({ legacy: true, runner: { mode: 'live', transport: () => response } });
     const citizen = Object.values(runtime.world.citizens)[0];
     const deposit = Object.values(runtime.world.deposits).find(
       (d) => d.x === citizen.x && d.y === citizen.y,

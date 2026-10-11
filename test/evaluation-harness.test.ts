@@ -8,6 +8,7 @@ import { developmentFixture, initializeFixture, totalGold } from '../src/evaluat
 import { developmentReference, noCommandBaseline } from '../src/evaluation/reference.ts';
 import { replayEpisode, runEpisode } from '../src/evaluation/runner.ts';
 import { createLocalModelCandidate, createNoCommandCandidate } from '../src/evaluation/candidates/index.ts';
+import { BALANCE, nutrition } from '../src/world/config.ts';
 const mockConfig = { endpoint: 'http://127.0.0.1:11434', model: 'mock-only-local', maxPromptBytes: 500000, maxInputTokens: 4000, maxOutputTokens: 200 }; 
 
 const outputs: string[] = [];
@@ -27,12 +28,12 @@ describe('real-world headless evaluation', () => {
     const report = await run(fixture, developmentReference(kind));
     expect(report.status).toBe('complete'); expect(report.success).toBe(true); expect(report.accountingValid).toBe(true);
     expect(report.outcome.actor.gold).toBe(0); expect(report.outcome.actor.inventory['food:1'] ?? 0).toBe(0);
-    expect(report.outcome.actor.fullness).toBeCloseTo(kind === 'buy-meal' ? 91.011111111 : 90.911111111, 8);
+    expect(report.outcome.actor.fullness).toBeCloseTo(80 + nutrition(1) - fixture.horizon * BALANCE.fullnessDrain, 8);
     const decision = records(report.outputDirectory).find(r => r.kind === 'decision');
     expect(decision.immediateObservation.citizen.fullness).toBe(80);
     expect(replayEpisode(report.outputDirectory).stateHash).toBe(report.outcome.stateHash);
     const baseline = await run(fixture, noCommandBaseline);
-    expect(baseline.success).toBe(false); expect(baseline.outcome.actor.fullness).toBeCloseTo(80 - fixture.horizon * .1);
+    expect(baseline.success).toBe(false); expect(baseline.outcome.actor.fullness).toBeCloseTo(80 - fixture.horizon * BALANCE.fullnessDrain);
     expect(baseline.outcome.actor.action).toBeNull(); expect(replayEpisode(baseline.outputDirectory).stateHash).toBe(baseline.outcome.stateHash);
   });
   it('strictly validates endowments and finite funded setup instead of repairing fixtures', () => {
@@ -124,7 +125,7 @@ describe('real-world headless evaluation', () => {
         async decide(input, signal) {
           expect(Object.isFrozen(input.observation.citizen)).toBe(true);
           expect(input).not.toHaveProperty('world');
-          expect(input.observation.visible.flatMap(t => t.citizens).filter(c => c.id !== input.observation.citizen.id).every(c => !('gold' in c))).toBe(true);
+          expect(input.observation.visible.flatMap(t => t.citizens).filter(c => c.id !== input.observation.citizen.id).every(c => typeof c.gold === 'number' && 'inventory' in c && !('plan' in c) && !('mind' in c))).toBe(true);
           await new Promise(resolve => setTimeout(resolve, 20));
           expect(input.observation.tick).toBe(0);
           return candidate.decide(input, signal);
@@ -133,15 +134,29 @@ describe('real-world headless evaluation', () => {
     expect(report.success).toBe(true); expect(report.ticks).toBe(1); expect(report.costs.candidateMs).toBeGreaterThan(15);
   });
   it('contains aborted late results with no dispatch and records a normal no-command cadence', async () => {
+    let aborted = false; let lateResultSettled = false;
     const report = await run(developmentFixture('buy-meal'), () => {
       const candidate = noCommandBaseline();
       return { ...candidate, decide(input, signal) {
-        return new Promise(resolve => signal.addEventListener('abort', () => setTimeout(() => resolve({ requestId: input.requestId, kind: 'command', command: { type: 'order', side: 'buy', item: 'food:1', quantity: 1, price: 4 } }), 2), { once: true }));
+        return new Promise(resolve => signal.addEventListener('abort', () => {
+          aborted = true;
+          // Settle after the timeout rejects, without a second wall-clock timer
+          // competing with the containment deadline under parallel-suite load.
+          queueMicrotask(() => {
+            lateResultSettled = true;
+            resolve({ requestId: input.requestId, kind: 'command', command: { type: 'order', side: 'buy', item: 'food:1', quantity: 1, price: 4 } });
+          });
+        }, { once: true }));
       } };
-    }, { limits: { decisionTimeoutMs: 10, teardownTimeoutMs: 100 } });
+    // The 10ms decision timeout is the behavior under test; the episode's
+    // overall wall budget must also accommodate parallel-suite contention.
+    }, { limits: { decisionTimeoutMs: 10, teardownTimeoutMs: 100, episodeTimeoutMs: 60000 } });
+    expect(aborted).toBe(true); expect(lateResultSettled).toBe(true);
     expect(report.status).toBe('complete'); expect(report.success).toBe(false); expect(report.ticks).toBe(1);
     expect(report.outcome.actor.gold).toBe(4); expect(report.failures).toBe(1);
-    expect(records(report.outputDirectory).find(r => r.kind === 'decision').commit.failure).toBe('timeout');
+    const decision = records(report.outputDirectory).find(r => r.kind === 'decision');
+    expect(decision.commit.failure).toBe('timeout');
+    expect(decision.commit.decision).toBeNull(); expect(decision.commit.dispatchResult).toBeUndefined();
     expect(replayEpisode(report.outputDirectory).stateHash).toBe(report.outcome.stateHash);
   });
   it('stops an uncontained timeout before any tick and blocks reuse', async () => {
@@ -252,16 +267,18 @@ describe('real-world headless evaluation', () => {
       calls++;
       return { text: JSON.stringify({ requestId: request.requestId, kind: 'advance' }), usage: { inputTokens: 100, outputTokens: 30 } };
     } });
-    const report = await run(developmentFixture('buy-meal', 1, 3), factory, { limits: { maxModelCalls: 3, maxTokens: 4200 } });
+    // This checks numeric reservations/cadence, not wall-clock throughput under
+    // parallel fork contention. Keep the call/token/tick budgets unchanged.
+    const report = await run(developmentFixture('buy-meal', 1, 3), factory, { limits: { episodeTimeoutMs: 60000, maxModelCalls: 3, maxTokens: 4200 } });
     expect(calls).toBe(1); expect(report.usage.tokens).toBe(130);
     expect(report.status).toBe('incomplete'); expect(report.reason).toBe('resource-budget'); expect(report.ticks).toBe(1);
     const failure = records(report.outputDirectory).find(r => r.kind === 'candidate-failure');
     expect(failure.tick).toBe(1); expect(failure.commit.decision).toBeNull();
     expect(replayEpisode(report.outputDirectory).stateHash).toBe(report.outcome.stateHash);
-    const perDecision = await run(developmentFixture('buy-meal', 1, 3), factory, { limits: { maxModelCalls: 3, maxTokens: 8400, maxTokensPerDecision: 4100 } });
+    const perDecision = await run(developmentFixture('buy-meal', 1, 3), factory, { limits: { episodeTimeoutMs: 60000, maxModelCalls: 3, maxTokens: 8400, maxTokensPerDecision: 4100 } });
     expect(calls).toBe(1); expect(perDecision.usage.modelCalls).toBe(0);
     expect(perDecision.status).toBe('complete'); expect(perDecision.ticks).toBe(3); expect(perDecision.failures).toBe(3);
-  });
+  }, 150000);
   it('does not mistake prompt abort for containment of an outstanding underlying mock operation', async () => {
     const adapter = createLocalModelCandidate(mockConfig, { capability: 'mock', complete() { return new Promise(() => {}); } });
     const report = await run(developmentFixture('buy-meal'), () => adapter, { limits: { decisionTimeoutMs: 10, teardownTimeoutMs: 10, maxModelCalls: 1, maxTokens: 4200 } });

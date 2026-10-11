@@ -1,3 +1,4 @@
+import { BALANCE } from '../src/world/config.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -155,7 +156,7 @@ describe('evaluator-owned held-out prerequisite combinations', () => {
         expect(trace.filter(r => r.kind === 'decision').every(r => r.commit.decision.kind === 'advance' && !r.commit.dispatchResult)).toBe(true);
         expect(trace.every(r => r.actor.action === null && r.actor.queue.length === 0)).toBe(true);
         expect(Object.values(episode.outcome.orders)).toHaveLength(caseId === 'tool-production-sale' ? 2 : 1);
-        expect(episode.outcome.actor.fullness).toBeCloseTo(control === 'standard' ? 88 : 99.11111111111111, 8);
+        expect(episode.outcome.actor.fullness).toBeCloseTo(100 - 120 * BALANCE.fullnessDrain, 8);
       });
     }
 

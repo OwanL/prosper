@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import type { MotionSnapshot } from '../../src/shared/motion-types';
 import { createWorld } from '../../src/world/core';
 import { observe } from '../../src/world/observation';
@@ -16,6 +16,7 @@ test('tick stream follows confirmed corners between unchanged state polls and cl
   const snapshot: AppSnapshot = {
     world,
     status: {
+      decisionTreeDebug: false,
       state: 'ready',
       running: true,
       speed: 1,
@@ -56,7 +57,7 @@ test('tick stream follows confirmed corners between unchanged state polls and cl
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (request.method() === 'GET' && path === '/api/state')
-      await route.fulfill({ json: snapshot });
+      await route.fulfill({ json: spectatorFixture(snapshot) });
     else if (request.method() === 'GET' && path === `/api/citizens/${citizen.id}/observation`)
       await route.fulfill({ json: observe(world, citizen.id) });
     else if (request.method() === 'GET' && path === '/api/history/global')

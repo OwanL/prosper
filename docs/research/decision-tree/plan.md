@@ -1,9 +1,15 @@
 # Composed decision-tree implementation plan
 
 Date: 2026-10-10
-Status: planning checkpoint. The user supports this as a promising implementation direction and requested documenting the decisions. No controller implementation, live integration, model experiment or training is authorized by this document alone.
+Status: historical planning checkpoint with implementation addendum (11 October 2026). The user subsequently authorized composed-controller/mechanics implementation and default Local AI integration. The original design discussion below preserves decision provenance: its design-only restrictions describe that earlier stage, not the current runtime. See [implementation checkpoint](composed-implementation.md) and [current evaluation](composed-evaluation.md); no final quality acceptance, model experiment or training is implied.
 
 This plan updates the earlier architecture discussion in [citizen intelligence research](../../citizen-intelligence-research.md). It records agreed direction separately from proposed implementation details and unresolved choices. It does not establish that the design produces capable citizens.
+
+## Follow-up implementation addendum — 11 October 2026
+
+The user approved first-completion-wins harvest contention, adaptive quotes/repricing with exact own-order settlement evidence, visible competitors' estimated tools/travel/work, purposeful frontier exploration, territory colors and sortable citizen resources/membership/gold. These follow-ups are now represented in the inspected core, observation, tree-harvest, tree-market, tree-actions and UI modules; see [implementation status and control locations](composed-implementation.md#requested-follow-up-implementation-status--11-october-2026). This addendum supersedes any earlier exclusive harvest-reservation assumption below: concurrent work does not reserve yield, and completion settles actual stock. Other custody/order reservations remain distinct.
+
+Optional mutual family invitations/preparation remain in progress, not an accepted natural-birth-rate solution. The latest supplied measured seed-7 result remains zero births. Earlier planning restrictions and measurements are historical provenance, not evidence that subsequent implementation has passed acceptance. A stabilized genuine rerun must establish behavioral improvements; no new outcomes are inferred from source changes.
 
 ## 1. Desired outcome
 
@@ -413,7 +419,21 @@ Related references: [headless harness usage](../evaluation-harness-usage.md), [d
 | `CanSleep` | Condition | Planned | Check a known permitted, reachable sleeping option under the eventual house/outdoor rules. |
 | `Sleep` | Action | Planned | Choose a sleeping option, travel if needed and confirm requested rest recovery, or report interruption/failure. |
 
-### Approved pair boundaries — 2026-10-10
+### Current executable coverage — 2026-10-11
+
+This is the current status overlay for the canonical registry above; its Drafted/Planned column records the **historical diagram status**, not present runtime absence. Descriptive `.ts`/Mermaid drafts remain separate from executable definitions.
+
+| Registry group | Implementation / evidence boundary |
+| --- | --- |
+| Food/resource acquisition, tools, harvest, refining, sales | Guards/actions in `src/citizen/tree-actions.ts`; `HarvestResource` is implemented as `Harvest`. Local action/market/engine tests cover execution and receipts, not profitable specialization. |
+| Stations, houses, walls, sleep, exploration | Executable guards/actions plus core physical mechanics; engine tests cover construction/rest. Seeded evaluation shows houses/sleep/exploration, but no station/refinement progression. |
+| Territory facts, creation/expansion, joining/leaving, building use | Executable conditions/actions and `src/world/territory.ts`; territory/engine tests cover membership, marking, access and lifecycle. Evaluation established no territories and recorded knowledge-gate failures. |
+| Gifts, reproduction, citizen/structure attacks | Executable guards/actions and reputation/life/core settlement; life/engine tests cover mechanics. Seeded gifts/combat exist; births remain unestablished. |
+| Main selection, memory, ownership/cleanup | `src/world/tree-controller.ts`, `tree-selection.ts`, `tree-memory.ts`; controller/cognition/action/runtime tests. Stochastic tasks with ten dispositions, no long-term planner; optional director not implemented. |
+
+Source/test paths and provisional defaults are summarized in [composed implementation](composed-implementation.md). Coverage means an implementation and focused tests exist, not complete design fidelity or final suite/evaluation acceptance. Stepping/visualization and forecast quality remain incomplete. Legacy alliances/loot/building trade persist only in compatibility worlds; composed worlds use the replacement mechanics without silently migrating saved worlds.
+
+### Approved pair boundaries — 2026-10-10 (historical design contracts)
 
 Use `CanX` / `X` for meaningful action responsibilities. Names should explain the citizen-visible outcome, not an internal algorithm. Pure facts such as `InTerritory`, `OwnsTerritory` and `IsTerritoryMember` do not need artificial action counterparts.
 
@@ -441,7 +461,7 @@ Use `CanX` / `X` for meaningful action responsibilities. Names should explain th
 
 - **`CanExplore` / `Explore`:** approved on 2026-10-10. Parent supplies a search purpose and limits, such as finding a requested resource tier or suitable territory land. Guard checks a known permitted investigation route; action chooses destinations, travels and obtains new/refreshed observations until the goal is met or search ends without success. No guaranteed discovery, harvesting or claiming. Exploration remains outside `ObtainResource`'s known-route acquisition scope.
 
-- **`CanReproduce` / `Reproduce`:** approved on 2026-10-10 after the world-coverage audit. Guard checks own known physical/material prerequisites and a potential partner; no assumed consent/private stock. Action chooses a partner, handles consent and meeting, revalidates both participants and confirms reproduction. Parent owns the family decision and supplies own required food. Refusal or failed preparation is not success. Child creation, family reputation and newborn membership are separate mechanics.
+- **`CanReproduce` / `Reproduce`:** approved on 2026-10-10 after the world-coverage audit. **Superseded on 2026-10-11:** current execution requires adjacency and one T1 food each, without consent or rendezvous; the following records the earlier approval, not the current rule. Guard checks own known physical/material prerequisites and a potential partner; no assumed consent/private stock. Action chooses a partner, handles consent and meeting, revalidates both participants and confirms reproduction. Parent owns the family decision and supplies own required food. Refusal or failed preparation is not success. Child creation, family reputation and newborn membership are separate mechanics.
 
 - **`CanBuildWall` / `BuildWall`:** approved on 2026-10-10. Guard checks materials and known feasible placements for requested tier/extent; action chooses placement, travels and completes the wall section. Parent supplies purpose, extent/location constraints and materials. Walls physically block movement; this is a construction job, not one subtree per tile. No territory policy, structure attack or automatic claim of enclosed land.
 

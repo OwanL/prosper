@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import { createWorld, dispatch, tickWorld } from '../../src/world/core';
 import { enableAutonomy } from '../../src/world/autonomy';
 import { claimTerritory, formAlliance } from '../../src/world/society';
@@ -58,6 +58,7 @@ function sceneFixture(population = 6): AppSnapshot {
   return {
     world,
     status: {
+      decisionTreeDebug: false,
       state: 'ready',
       running: true,
       speed: 1,
@@ -104,7 +105,7 @@ async function mount(page: Page, snapshot = sceneFixture()) {
       return;
     }
     if (path === '/api/state') {
-      await route.fulfill({ json: snapshot });
+      await route.fulfill({ json: spectatorFixture(snapshot) });
       return;
     }
     if (path === '/api/history/global') {

@@ -40,8 +40,8 @@ function setup(
   citizen.y = 1;
   partner.x = 2;
   partner.y = 1;
-  citizen.inventory = { 'food:2': 12, 'wood:1': 6, 'fibre:1': 6 };
-  partner.inventory = { 'food:2': 12 };
+  citizen.inventory = { 'food:1': 12, 'wood:1': 6, 'fibre:1': 6 };
+  partner.inventory = { 'food:1': 12 };
   citizen.knowledge = {};
   partner.knowledge = {};
   world.deposits = {
@@ -298,35 +298,33 @@ describe('commands accompanying a strategy', () => {
     expect(citizen.action).toBeNull();
   });
 
-  it('does not manufacture a partner consent after a strategy', async () => {
+  it('rejects deprecated consent without manufacturing records after a strategy', async () => {
     const { world, citizen, partner, runner } = setup(() => ({
       toolCalls: [
         call('keep', 'set_strategy', { mode: 'keep' }),
         call('consent', 'command', { type: 'consent', partnerId: partner.id, accept: true }),
-        call('reproduce', 'command', { type: 'reproduce', partnerId: partner.id }),
       ],
     }));
     const initialPopulation = Object.keys(world.citizens).length;
     await runner.startTurn(citizen.id);
     expect(runner.records()[0].toolEvents.at(-1)?.result).toMatchObject({
       ok: false,
-      code: 'consent-required',
+      code: 'unsupported-command',
     });
     expect(citizen.action).toBeNull();
     expect(partner.action).toBeNull();
-    expect(citizen.inventory['food:2']).toBe(12);
+    expect(citizen.inventory['food:1']).toBe(12);
     expect(Object.keys(world.citizens)).toHaveLength(initialPopulation);
   });
 
-  it('allows chosen reproduction after keep while requiring both parents consent and paying both costs', async () => {
+  it('allows chosen reproduction after keep with no consent and pays both T1 costs', async () => {
     const { world, citizen, partner, runner, requests } = setup(() => ({
       toolCalls: [
         call('keep', 'set_strategy', { mode: 'keep' }),
-        call('consent', 'command', { type: 'consent', partnerId: partner.id, accept: true }),
+        call('reproduce', 'command', { type: 'reproduce', partnerId: partner.id }),
         call('reproduce', 'command', { type: 'reproduce', partnerId: partner.id }),
       ],
     }));
-    dispatch(world, partner.id, { type: 'consent', partnerId: citizen.id, accept: true });
     await runner.startTurn(citizen.id);
     expect(requests).toHaveLength(1);
     expect(citizen.action?.command.type).toBe('reproduce');
@@ -335,7 +333,7 @@ describe('commands accompanying a strategy', () => {
     expect(
       Object.values(world.citizens).filter((c) => c.parents.includes(citizen.id)),
     ).toHaveLength(1);
-    expect(citizen.inventory['food:2']).toBe(12 - BALANCE.reproductionFood);
-    expect(partner.inventory['food:2']).toBe(12 - BALANCE.reproductionFood);
+    expect(citizen.inventory['food:1']).toBe(12 - BALANCE.reproductionFood);
+    expect(partner.inventory['food:1']).toBe(12 - BALANCE.reproductionFood);
   });
 });

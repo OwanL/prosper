@@ -16,7 +16,7 @@ function setup() {
   for (const [i, c] of [a, b, other].entries()) {
     c.x = 1 + i;
     c.y = 1;
-    c.inventory = { 'food:2': 10 };
+    c.inventory = { 'food:1': 10 };
     c.fullness = 100;
     c.knowledge = {};
   }
@@ -40,10 +40,7 @@ function setup() {
       ).ok,
     ).toBe(true);
   };
-  const consent = () => {
-    expect(dispatch(world, a.id, { type: 'consent', partnerId: b.id, accept: true }).ok).toBe(true);
-    expect(dispatch(world, b.id, { type: 'consent', partnerId: a.id, accept: true }).ok).toBe(true);
-  };
+  const consent = () => {}; // historical fixture helper; no prerequisite
   const tick = (n = 1) => {
     for (let i = 0; i < n; i++) {
       tickWorld(world);
@@ -54,7 +51,7 @@ function setup() {
   return { world, a, b, other, actions, choose, consent, tick };
 }
 
-describe('joint reproduction directive identity', () => {
+describe('consent-free joint reproduction directive identity', () => {
   it('reconciles a completed approach pending when the counterpart installs shared work', () => {
     const { world, a, b, actions, choose, consent, tick } = setup();
     b.x = 4;
@@ -88,7 +85,7 @@ describe('joint reproduction directive identity', () => {
     expect(world.events.filter((e) => e.kind === 'birth')).toHaveLength(1);
     for (const c of [a, b]) {
       expect(c.strategy?.status).toBe('completed');
-      expect(c.inventory['food:2']).toBe(7);
+      expect(c.inventory['food:1']).toBe(9);
       expect(
         c.directiveReceipts?.filter((r) => r.outcome === 'completed' && r.index === 0),
       ).toHaveLength(1);
@@ -108,8 +105,8 @@ describe('joint reproduction directive identity', () => {
     // A chosen replacement on B cancels both halves and refunds their inputs.
     choose(b);
     expect(a.strategy!.pending?.result?.code).toBe('joint-cancelled');
-    expect(a.inventory['food:2']).toBe(10);
-    expect(b.inventory['food:2']).toBe(10);
+    expect(a.inventory['food:1']).toBe(10);
+    expect(b.inventory['food:1']).toBe(10);
     advanceDirectives(world, b, actions(b));
     expect(b.action!.id).not.toBe(oldId);
     advanceDirectives(world, a, actions(a));
@@ -125,8 +122,8 @@ describe('joint reproduction directive identity', () => {
     expect(world.events.filter((e) => e.kind === 'birth')).toHaveLength(1);
     expect(a.strategy?.status).toBe('completed');
     expect(b.strategy?.status).toBe('completed');
-    expect(a.inventory['food:2']).toBe(7);
-    expect(b.inventory['food:2']).toBe(7);
+    expect(a.inventory['food:1']).toBe(9);
+    expect(b.inventory['food:1']).toBe(9);
   });
 
   it('reconciles stale cancellation after the first parent runs before the replacement parent', () => {
@@ -140,8 +137,8 @@ describe('joint reproduction directive identity', () => {
     const goals = structuredClone(a.goals);
     choose(b);
     expect(a.strategy!.pending?.result?.code).toBe('joint-cancelled');
-    expect(a.inventory['food:2']).toBe(10);
-    expect(b.inventory['food:2']).toBe(10);
+    expect(a.inventory['food:1']).toBe(10);
+    expect(b.inventory['food:1']).toBe(10);
     // Real core order: A consumes the old receipt before B starts replacement work.
     tick();
     const jointId = b.action!.id;
@@ -155,7 +152,7 @@ describe('joint reproduction directive identity', () => {
     expect(world.events.filter((e) => e.kind === 'birth')).toHaveLength(1);
     for (const c of [a, b]) {
       expect(c.strategy?.status).toBe('completed');
-      expect(c.inventory['food:2']).toBe(7);
+      expect(c.inventory['food:1']).toBe(9);
       expect(
         c.directiveReceipts?.filter((r) => r.outcome === 'completed' && r.index === 0),
       ).toHaveLength(1);
@@ -174,7 +171,7 @@ describe('joint reproduction directive identity', () => {
     expect(world.events.filter((e) => e.kind === 'birth')).toHaveLength(1);
     for (const c of [a, b]) {
       expect(c.strategy?.status).toBe('completed');
-      expect(c.inventory['food:2']).toBe(7);
+      expect(c.inventory['food:1']).toBe(9);
       expect(c.directiveReceipts?.some((r) => r.outcome === 'blocked')).toBe(false);
     }
   });
@@ -196,10 +193,12 @@ describe('joint reproduction directive identity', () => {
   it('does not revive a reproduction directive blocked on an unrelated prerequisite', () => {
     const { world, a, b, choose, consent, tick } = setup();
     choose(a);
-    tick(); // No mutual consent: this is not an old joint lifecycle receipt.
+    a.health = 74;
+    tick(); // Health rejection is not an old joint lifecycle receipt.
     expect(a.strategy?.status).toBe('blocked');
     expect(a.strategy?.pending).toBeUndefined();
     const reason = a.strategy?.blockedReason;
+    a.health = 100;
     consent();
     choose(b);
     tick(BALANCE.reproductionTicks + 50);
@@ -231,26 +230,24 @@ describe('joint reproduction directive identity', () => {
     },
   );
 
-  it('withdrawal returns each reservation once and fails the participating strategies', () => {
+  it('cancellation returns each reservation once and fails the participating strategies', () => {
     const { a, b, world, actions, choose, consent, tick } = setup();
     choose(a);
     choose(b);
     consent();
     const goals = [structuredClone(a.goals), structuredClone(b.goals)];
     advanceDirectives(world, a, actions(a));
-    expect(dispatch(world, a.id, { type: 'consent', partnerId: b.id, accept: false }).ok).toBe(
-      true,
-    );
+    cancelAction(world, a.id);
     tick(2);
     for (const c of [a, b]) {
-      expect(c.inventory['food:2']).toBe(10);
+      expect(c.inventory['food:1']).toBe(10);
       expect(c.action).toBeNull();
-      expect(c.strategy?.status).toBe('blocked');
+      expect(c.strategy?.status).toBe(c === a ? undefined : 'blocked');
     }
     cancelAction(world, a.id);
     cancelAction(world, b.id);
-    expect(a.inventory['food:2']).toBe(10);
-    expect(b.inventory['food:2']).toBe(10);
+    expect(a.inventory['food:1']).toBe(10);
+    expect(b.inventory['food:1']).toBe(10);
     expect([a.goals, b.goals]).toEqual(goals);
     expect(world.events.filter((e) => e.kind === 'birth')).toHaveLength(0);
   });

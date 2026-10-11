@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import { createWorld } from '../../src/world/core';
 
 // Every API request is intercepted; layout controls cannot touch a durable world.
@@ -7,7 +7,7 @@ async function offline(page: Page) {
   const world = createWorld({ seed: 19, runId: 'offline-panel-resize', population: 20 });
   const snapshot: AppSnapshot = {
     world,
-    status: { state: 'ready', running: false, speed: 1, mode: 'scripted', generation: 1, thinking: [] },
+    status: { decisionTreeDebug: false, state: 'ready', running: false, speed: 1, mode: 'scripted', generation: 1, thinking: [] },
     budget: { requests: 0, limit: 100, pending: 0, spent: 0, tokens: 0, maxTokens: 100000, unit: 'requests' },
     turns: [],
   };
@@ -15,7 +15,7 @@ async function offline(page: Page) {
   await page.route('**/api/**', async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (request.method() === 'GET' && path === '/api/state') await route.fulfill({ json: snapshot });
+    if (request.method() === 'GET' && path === '/api/state') await route.fulfill({ json: spectatorFixture(snapshot) });
     else if (request.method() === 'GET' && path === '/api/history/global') {
       await route.fulfill({ json: { runId: world.runId, tick: world.tick, startedTick: 0, cadence: 20, limit: 256, frames: [] } });
     } else {

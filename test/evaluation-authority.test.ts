@@ -111,7 +111,7 @@ describe('runner-owned evaluation authority', () => {
     expect(actor.inventory['food:1']).toBe(1);
     tick();
     expect(actor.inventory['food:1'] ?? 0).toBe(0);
-    expect(actor.fullness).toBeCloseTo(79.9 + nutrition(1));
+    expect(actor.fullness).toBeCloseTo(80 - BALANCE.fullnessDrain + nutrition(1));
     expect(actor.gold).toBe(0);
     expect(peer.gold).toBe(sellerGold + 4);
     expect(world.events.filter((e) => e.kind === 'meal' && e.citizenId === actor.id)).toHaveLength(1);
@@ -212,9 +212,7 @@ describe('runner-owned evaluation authority', () => {
 
   it('registers real newborns as passive bodies and replays a serialized continuation with one knowledge refresh per tick', () => {
     const { world, actor, peer, options, send, tick } = fixture(true, 2);
-    for (const parent of [actor, peer]) parent.inventory = { 'food:2': BALANCE.reproductionFood };
-    send(actor, { type: 'consent', partnerId: peer.id, accept: true });
-    send(peer, { type: 'consent', partnerId: actor.id, accept: true });
+    for (const parent of [actor, peer]) parent.inventory = { 'food:1': BALANCE.reproductionFood };
     send(actor, { type: 'reproduce', partnerId: peer.id });
     tick(BALANCE.reproductionTicks);
     const child = Object.values(world.citizens).find((c) => c.parents.length)!;

@@ -2,7 +2,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AppSnapshot } from '../../src/shared/types';
+import { spectatorFixture, type AuthoritativeFixture as AppSnapshot } from './fixture';
 import { HISTORY_CADENCE, HISTORY_LIMIT, type HistoryMeta } from '../../src/shared/telemetry-types';
 import { createWorld } from '../../src/world/core';
 import { observe, updateKnowledge } from '../../src/world/observation';
@@ -81,7 +81,7 @@ function fixture(populated = true): AppSnapshot {
   }
   return {
     world,
-    status: { state: 'ready', running: false, speed: 1, mode: 'live', generation: 1, thinking: [] },
+    status: { decisionTreeDebug: false, state: 'ready', running: false, speed: 1, mode: 'live', generation: 1, thinking: [] },
     budget: {
       requests: 3,
       limit: 20,
@@ -133,7 +133,7 @@ async function mockApi(page: Page, snapshot = fixture()): Promise<ApiMock> {
       await route.fulfill(
         mock.stateError
           ? { status: 503, body: 'Fixture backend unavailable' }
-          : { json: mock.snapshot },
+          : { json: spectatorFixture(mock.snapshot) },
       );
       return;
     }
@@ -163,7 +163,7 @@ async function mockApi(page: Page, snapshot = fixture()): Promise<ApiMock> {
         mock.snapshot.world = createWorld({ seed: 999, runId: 'dashboard-reset-world' });
         mock.snapshot.status.running = false;
         mock.snapshot.turns = [];
-        await route.fulfill({ json: mock.snapshot });
+        await route.fulfill({ json: spectatorFixture(mock.snapshot) });
         return;
       }
       if (path === '/api/budget') {
@@ -174,7 +174,7 @@ async function mockApi(page: Page, snapshot = fixture()): Promise<ApiMock> {
           mock.snapshot.budget.limit = caps.maxRequests;
           mock.snapshot.budget.maxTokens = caps.maxTokens;
           delete mock.snapshot.budget.blocked;
-          await route.fulfill({ json: mock.snapshot });
+          await route.fulfill({ json: spectatorFixture(mock.snapshot) });
         }
         return;
       }

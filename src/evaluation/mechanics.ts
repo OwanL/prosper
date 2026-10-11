@@ -45,7 +45,6 @@ const tables = {
     reproductionHealth: BALANCE.reproductionHealth,
     reproductionTicks: BALANCE.reproductionTicks,
     reproductionCooldown: BALANCE.reproductionCooldown,
-    consentTicks: BALANCE.consentTicks,
     newbornHealth: BALANCE.newbornHealth,
     newbornFullness: BALANCE.newbornFullness,
     queueLimit: BALANCE.queueLimit,
@@ -115,7 +114,7 @@ Citizen command validation rejects unknown entity references. Harvest, refine, a
 
 COMBAT, BODIES AND FAMILY
 Attack pursues a citizen/building using visible or dated knowledge and requires a walkable adjacent/same-tile strike position. Out-of-sight targets are searched at their last-known position, not tracked by hidden live coordinates. Repeated timed strikes deal attackDamageBySwordTier * (0.5 + a random value in [0,1)) damage (usable sword tier zero means bare hands); targets can move, die or be destroyed. Destruction refunds processing reservations and awards floor(original construction inputs * salvageFraction) to the attacker once. On citizen death, work inputs and market escrow return before settlement, property becomes unowned and consent clears. A living killer receives the victim's gold/inventory; otherwise those holdings remain in a body. Loot travels to a body and takes lootTicks to collect it; no remote pickup.
-Consent requires partnerId and explicit boolean accept; messages do not constitute consent. Acceptance expires after consentTicks; withdrawal cancels joint reproduction. Reproduce requires another living, idle partner on the same/adjacent walkable tile, mutual unexpired consent, reproductionHealth and completed cooldown for both parents, and the table's unreserved food cost PER PARENT. Joint work occupies both parents for reproductionTicks. Prerequisites remain authoritative during work; cancellation refunds unused food. Completion produces a child and starts both parents' reproductionCooldown.
+Reproduce requires another living, idle partner on the same/adjacent walkable tile, reproductionHealth and completed cooldown for both parents, and one unreserved T1 food PER PARENT. No consent, invitation or mutual choice is required. Joint work occupies both parents for reproductionTicks. Prerequisites remain authoritative during work; cancellation refunds unused food. Completion produces a child and starts both parents' reproductionCooldown.
 
 MESSAGES AND PERSONAL NOTES
 Message sends bounded nonempty text publicly or to a known living recipient, limited by messagesPerWindow/messageWindow and retained messageHistory. Remember adds a bounded personal note, evicting oldest notes above memoryLimit. Goals replaces the personal list with at most goalLimit bounded nonempty strings. Notes/messages/goals do not directly produce goods or enact physical work.

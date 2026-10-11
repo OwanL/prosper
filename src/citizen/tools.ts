@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_TIER, TIERS, TRADABLE_ITEM_RE } from '../shared/tiers.ts';
+import { MAX_TIER, TIERS, TRADABLE_ITEM_RE, CARRIED_ITEM_RE, EQUIPMENT_ITEM_RE } from '../shared/tiers.ts';
 import { draftPlanParameters, approvePlanParameters } from './plan-schema.ts';
 import { strategyParameters } from './directive-schema.ts';
 import type { Command, CitizenObservation } from '../shared/types.ts';
@@ -25,7 +25,15 @@ export const commandSchema = z.union([
   variant('attack', { targetId: id }),
   variant('loot', { lootId: id }),
   variant('cancel', {}),
-  variant('order', { side: z.enum(['buy', 'sell']), item, quantity: positive, price: positive }),
+  variant('order', {
+    side: z.enum(['buy', 'sell']), item: z.string().regex(CARRIED_ITEM_RE),
+    quantity: z.number().finite().positive().max(Number.MAX_SAFE_INTEGER), price: positive,
+  }).superRefine((order, context) => {
+    if (EQUIPMENT_ITEM_RE.test(order.item) && !Number.isSafeInteger(order.quantity))
+      context.addIssue({ code: 'custom', path: ['quantity'], message: 'Tool quantity must be a whole safe integer' });
+    if (!Number.isFinite(order.quantity * order.price) || order.quantity * order.price > Number.MAX_SAFE_INTEGER)
+      context.addIssue({ code: 'custom', path: ['quantity'], message: 'Quantity times unit price must have a safe total' });
+  }),
   variant('cancel-order', { orderId: id }),
   variant('transfer', { citizenId: id, gold: positive }),
   variant('give', { citizenId: id, item, quantity: positive }),
@@ -34,11 +42,12 @@ export const commandSchema = z.union([
   variant('goals', {
     goals: z.array(z.string().min(1).max(BALANCE.goalLength)).max(BALANCE.goalLimit),
   }),
-  variant('reproduce', { partnerId: id }),
+  // Read-only compatibility for persisted legacy requests/traces; dispatcher rejects it.
   variant('consent', { partnerId: id, accept: z.boolean() }),
+  variant('reproduce', { partnerId: id }),
 ]);
 const tileSchema = z.object({ x: coordinate, y: coordinate }).strict();
-const actionTypes = commandSchema.options.map((schema) => schema.shape.type.value);
+const actionTypes = commandSchema.options.map((schema) => schema.shape.type.value).filter(type => type !== 'consent');
 // Ollama needs a root object: a top-level union can lose the discriminator.
 // Advertising optional subtype fields does NOT relax strict per-action validation.
 const commandParameters = {
@@ -59,7 +68,7 @@ const commandParameters = {
     item: {
       type: 'string',
       description:
-        'craft: axe/scythe/knife/sword; order: exact key e.g. axe:1, wood:1, building:<ID>.',
+        'craft: axe/scythe/knife/sword; order: exact commodity/tool key e.g. axe:1, wood:1. Buildings cannot be traded.',
     },
     tier: { type: 'integer', enum: [...TIERS], description: 'Required for craft/build.' },
     kind: {
@@ -81,8 +90,11 @@ const commandParameters = {
       description:
         'Required for order: global gold-only market, instant remote settlement on matching; no barter or meetup.',
     },
-    quantity: { type: 'integer', minimum: 1, description: 'Required for order.' },
-    price: { type: 'integer', minimum: 1, description: 'Required for order; gold per unit.' },
+    quantity: {
+      type: 'number', exclusiveMinimum: 0, maximum: Number.MAX_SAFE_INTEGER,
+      description: 'Required for order/give. Order commodities allow positive finite fractions; tools require whole units. give requires whole units. Order quantity times price must not exceed the safe integer maximum.',
+    },
+    price: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER, description: 'Required for order; whole gold per unit.' },
     orderId: { type: 'string', description: 'Required for cancel-order.' },
     citizenId: { type: 'string', description: 'Required for transfer.' },
     gold: {
@@ -104,8 +116,7 @@ const commandParameters = {
       maxItems: BALANCE.goalLimit,
       description: 'Required for goals.',
     },
-    partnerId: { type: 'string', description: 'Required for reproduce/consent.' },
-    accept: { type: 'boolean', description: 'Required for consent.' },
+    partnerId: { type: 'string', description: 'Required for reproduce.' },
     queue: {
       type: 'string',
       enum: ['replace', 'append'],
@@ -133,7 +144,6 @@ const examples: Record<string, object> = {
   remember: { type: 'remember', text: 'Keep unfinished intent here.' },
   goals: { type: 'goals', goals: ['Gather food'] },
   reproduce: { type: 'reproduce', partnerId: '<visible citizen ID>' },
-  consent: { type: 'consent', partnerId: '<known citizen ID>', accept: true },
 };
 export const legacyTools = [
   {

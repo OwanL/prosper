@@ -39,9 +39,15 @@ import { createWorld } from '../src/world/core.ts';
           totals[ring].rare += group.filter((d) => d.tier === base + 1).length;
         }
       }
+      for (const deposit of deposits) {
+        if (deposit.resource === 'food') {
+          const angle = Math.atan2(deposit.y - (world.height - 1) / 2, deposit.x - (world.width - 1) / 2) + Math.PI;
+          expect(Math.floor(angle / (2 * Math.PI / 3))).toBe(1);
+        }
+      }
       for (const citizen of Object.values(world.citizens)) {
         expect(ringAt(world, citizen)).toBe(RING_COUNT - 1);
-        expect(deposits.some((d) => d.x === citizen.x && d.y === citizen.y && d.tier === 1)).toBe(true);
+        expect(citizen.inventory).toEqual({ 'food:1': BALANCE.startingFood });
       }
     }
     for (const band of totals) {

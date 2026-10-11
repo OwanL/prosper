@@ -6,7 +6,7 @@ import { createWorld, dispatch } from '../src/world/core.ts';
 import { observe } from '../src/world/observation.ts';
 import { event, id } from '../src/shared/utils.ts';
 import { TIERS } from '../src/shared/tiers.ts';
-import { harvestDuration } from '../src/world/config.ts';
+import { BALANCE, harvestDuration, nutrition } from '../src/world/config.ts';
 
 function setup() {
   const world = createWorld({ seed: 42 });
@@ -52,7 +52,7 @@ describe('advisory planning horizon and work-driven reviews', () => {
         reproduction: 24,
         regrowthAfterHarvest: 120,
       },
-      food: { availableFoodRunwayTicks: 311 },
+      food: { availableFoodRunwayTicks: Math.floor((20 + nutrition(1)) / BALANCE.fullnessDrain) },
     });
     const harvestRows = planning.actionTimingTicks.harvestByMatchingToolTier;
     expect(harvestRows.map((row) => row.toolTier)).toEqual([0, ...TIERS]);
@@ -159,10 +159,10 @@ describe('advisory planning horizon and work-driven reviews', () => {
   it('warns on worsening food risk, rearms after recovery, and preserves acknowledgements across JSON restore', async () => {
     const { world, citizen, runner } = setup();
     citizen.inventory = {};
-    citizen.fullness = 13;
+    citizen.fullness = 130 * BALANCE.fullnessDrain;
     await runner.startTurn(citizen.id);
     world.tick = 12;
-    citizen.fullness = 11;
+    citizen.fullness = 110 * BALANCE.fullnessDrain;
     expect(reviewReason(world, citizen)).toBe('food runway deteriorated');
     runner.tick();
     await runner.startTurn(citizen.id);
@@ -174,7 +174,7 @@ describe('advisory planning horizon and work-driven reviews', () => {
     citizen.fullness = 20;
     runner.tick();
     expect(citizen.review?.foodRisk).toBe(0);
-    citizen.fullness = 11;
+    citizen.fullness = 110 * BALANCE.fullnessDrain;
     expect(reviewReason(world, citizen)).toBe('food runway deteriorated');
     citizen.review = reviewState(world, citizen);
     citizen.fullness = 0;

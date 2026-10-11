@@ -5,7 +5,7 @@ import { distance, event, fail, itemKey, ok, random } from '../shared/utils.ts';
 import { BALANCE, buildingRecipe, canRefine, equipmentRecipe, MATCHING_TOOL, nutrition, refinementRecipe } from './config.ts';
 import { directiveActionResult } from './directives.ts';
 import { planActionResult } from './plans.ts';
-import { consentCommand, releaseAction } from './life.ts';
+import { releaseAction } from './life.ts';
 import { acquisitionFloor, marketNeeds, marketReserves, restingBid } from './market-intent.ts';
 import { findPath, walkable } from './pathfinding.ts';
 import { buyAvailable, carried, downconversionCommand, equipmentCommand, exploreCommand, gatherCommand, knownDeposits, projectCommand } from './production.ts';
@@ -81,9 +81,6 @@ export function setAutonomyPolicy(world:World,citizen:Citizen,policy:AutonomyPol
   citizen.autonomy!.policyRevision=(citizen.autonomy!.policyRevision??0)+1;
   citizen.autonomy!.reviewedTick=world.tick;
   const state=citizen.autonomy!,current=state.policy;
-  for(const partnerId of Object.keys(citizen.consent)) {
-    if(policy.partnerId===null||current.reproduction==='avoid'||current.partnerId&&current.partnerId!==partnerId||current.rivals.includes(partnerId)&&current.partnerId!==partnerId)consentCommand(world,citizen,{type:'consent',partnerId,accept:false});
-  }
   const requested=previousPartner;
   if(requested&&(policy.partnerId===null||current.reproduction==='avoid'||current.partnerId&&current.partnerId!==requested||current.rivals.includes(requested)&&current.partnerId!==requested)) {
     delete state.requestedPartnerId;delete state.meeting;delete state.familyFoodTarget;
@@ -256,7 +253,7 @@ export function productionSaturated(world:World,citizen:Citizen):boolean {
   if(resource==='food') {
     const tier=Math.min(state.policy.targetTier,highestToolTier(citizen,'knife')+1) as Tier;
     const nutritionHeld=TIERS.reduce((sum,t)=>sum+(held[itemKey('food',t)]??0)*nutrition(t),citizen.fullness);
-    const family=state.policy.reproduction==='avoid'?0:(BALANCE.reproductionFood+1)*nutrition(2);
+    const family=state.policy.reproduction==='avoid'?0:(BALANCE.reproductionFood+1)*nutrition(1);
     return nutritionHeld>state.policy.foodReserveTicks*BALANCE.fullnessDrain*2+family+buffer*nutrition(tier);
   }
   const developing=highestToolTier(citizen,MATCHING_TOOL[resource])<state.policy.targetTier;
@@ -285,7 +282,7 @@ function manageMarket(world:World,citizen:Citizen,actions:AutonomyActions):void 
     if(kind==='food') {
       const surplusFullness=(foodRunway(citizen)-state.policy.foodReserveTicks-200)*BALANCE.fullnessDrain;
       reserve=Math.max(0,amount-Math.floor(surplusFullness/nutrition(tier as Tier)));
-      if(tier===2&&state.policy.reproduction!=='avoid')reserve=Math.max(reserve,BALANCE.reproductionFood+1);
+      if(tier===1&&state.policy.reproduction!=='avoid')reserve=Math.max(reserve,BALANCE.reproductionFood+1);
     }
     const specialty=MATCHING_TOOL[state.policy.livelihood],nextTier=highestToolTier(citizen,specialty)+1;
     const goal=state.productionGoal ?? (nextTier<=state.policy.targetTier?{item:specialty,tier:nextTier as Tier}:undefined);
@@ -307,54 +304,10 @@ function manageMarket(world:World,citizen:Citizen,actions:AutonomyActions):void 
   }
 }
 function sociallyRelated(a:Citizen,b:Citizen):boolean { return a.parents.includes(b.id)||b.parents.includes(a.id)||a.parents.some((id)=>b.parents.includes(id)); }
-function familyCommand(world:World,citizen:Citizen,actions:AutonomyActions):Command|null {
-  const state=citizen.autonomy!,policy=state.policy;
-  state.signals??=[];state.sentSignals??={};
-  if(state.meeting&&world.tick-state.meeting.tick>=1800) {delete state.meeting;delete state.requestedPartnerId;if(state.intent.startsWith('Wait'))state.intent='Return to livelihood after a missed rendezvous';}
-  if(policy.reproduction==='avoid'||citizen.reproductionCooldown>world.tick||citizen.health<BALANCE.reproductionHealth||foodRunway(citizen)<550) {if(state.intent.startsWith('Wait'))state.intent='Return to livelihood';return null;}
-  const local=visibleCitizens(world,citizen);
-  const incoming=state.signals.findLast((signal)=>signal.kind==='family-offer'&&world.tick-signal.tick<1200&&(!state.requestedPartnerId||state.requestedPartnerId===signal.from)&&(!policy.partnerId||policy.partnerId===signal.from));
-  const proposer=incoming?local.find((p)=>p.id===incoming.from):undefined;
-  if(proposer&&world.tick-(state.sentSignals[`family-decline:${proposer.id}`]??-10000)>=300&&!sociallyRelated(citizen,proposer)&&(!policy.rivals.includes(proposer.id)||policy.partnerId===proposer.id)&&relationship(citizen,proposer.id).grievance<20&&(policy.partnerId===proposer.id||relationship(citizen,proposer.id).trust>=8||allied(world,citizen,proposer.id))) {
-    state.requestedPartnerId=proposer.id;
-    state.meeting={partnerId:proposer.id,x:incoming!.x!,y:incoming!.y!,tick:incoming!.tick};
-    if((state.sentSignals[`family-accept:${proposer.id}`]??-10000)<incoming!.tick) {
-      actions.command({type:'consent',partnerId:proposer.id,accept:true});
-      speak(world,citizen,actions,`I agree to prepare for a child and meet at (${incoming!.x},${incoming!.y}).`,proposer.id);
-      deliverSignal(world,citizen,proposer,{kind:'family-accept',x:incoming!.x,y:incoming!.y});
-    }
-  }
-  let partner=local.find((p)=>p.id===(state.requestedPartnerId??policy.partnerId));
-  if(!state.requestedPartnerId) {
-    if(!partner)partner=local.filter((p)=>world.tick-(state.sentSignals![`family-decline:${p.id}`]??-10000)>=300&&!policy.rivals.includes(p.id)&&!sociallyRelated(citizen,p)&&relationship(citizen,p.id).grievance<20&&(relationship(citizen,p.id).trust>=8||allied(world,citizen,p.id))).sort((a,b)=>relationship(citizen,b.id).trust-relationship(citizen,a.id).trust||a.id.localeCompare(b.id))[0];
-    if(!partner||sociallyRelated(citizen,partner)||(policy.reproduction!=='seek'&&!policy.partnerId&&relationship(citizen,partner.id).trust<30))return null;
-    state.requestedPartnerId=partner.id;
-    state.meeting={partnerId:partner.id,x:citizen.x,y:citizen.y,tick:world.tick};
-    actions.command({type:'consent',partnerId:partner.id,accept:true});
-    speak(world,citizen,actions,`I want to raise a child with you. I am preparing food; let's meet at (${citizen.x},${citizen.y}).`,partner.id);
-    deliverSignal(world,citizen,partner,{kind:'family-offer',x:citizen.x,y:citizen.y});
-  }
-  const meeting=state.meeting;
-  if(!meeting)return null;
-  if(carried(citizen,'food',2)<BALANCE.reproductionFood+1) {
-    state.familyFoodTarget=BALANCE.reproductionFood+1;
-    const buy=buyAvailable(world,citizen,'food:2',BALANCE.reproductionFood+1-carried(citizen,'food',2),policy.buyPrice*2);
-    if(buy)return buy;
-    const conversion=downconversionCommand(world,citizen,'food',2);
-    if(conversion)return conversion;
-    if(highestToolTier(citizen,'knife')<1)return equipmentCommand(world,citizen,'knife',1);
-    return gatherCommand(world,citizen,'food',2)??exploreCommand(world,citizen,true);
-  }
-  if(distance(citizen,meeting)>0)return {type:'move',x:meeting.x,y:meeting.y};
-  if(partner&&(state.sentSignals[`family-ready:${partner.id}`]??-10000)<world.tick-60) {
-    deliverSignal(world,citizen,partner,{kind:'family-ready',x:citizen.x,y:citizen.y});
-  }
-  const ready=state.signals.findLast((signal)=>signal.from===meeting.partnerId&&signal.kind==='family-ready'&&world.tick-signal.tick<120);
-  if(partner&&ready&&distance(citizen,partner)<=1&&!partner.action)return {type:'reproduce',partnerId:partner.id};
-  const accepted=state.signals.some((signal)=>signal.from===meeting.partnerId&&['family-accept','family-offer','family-ready'].includes(signal.kind)&&world.tick-signal.tick<1800);
-  if(accepted||world.tick-meeting.tick<100)state.intent=`Wait at rendezvous for willing co-parent ${meeting.partnerId}`;
-  else state.intent='Await a family response while pursuing livelihood';
-  return null;
+function familyCommand(world:World,citizen:Citizen,_actions:AutonomyActions):Command|null {
+  if(citizen.autonomy!.policy.reproduction==='avoid'||citizen.reproductionCooldown>world.tick||citizen.health<BALANCE.reproductionHealth||carried(citizen,'food',1)<1)return null;
+  const partner=visibleCitizens(world,citizen).find(p=>p.id!==citizen.id&&p.alive&&p.health>=BALANCE.reproductionHealth&&!p.action&&distance(citizen,p)<=1);
+  return partner?{type:'reproduce',partnerId:partner.id}:null;
 }
 function manageSocial(world:World,citizen:Citizen,actions:AutonomyActions):Command|null {
   const state=citizen.autonomy!,policy=state.policy;

@@ -53,8 +53,6 @@ describe('future-world character initialization', () => {
       parent.y = 1;
       parent.inventory[`food:${BALANCE.reproductionFoodTier}`] = BALANCE.reproductionFood;
     }
-    expect(dispatch(world, a.id, { type: 'consent', partnerId: b.id, accept: true }).ok).toBe(true);
-    expect(dispatch(world, b.id, { type: 'consent', partnerId: a.id, accept: true }).ok).toBe(true);
     expect(dispatch(world, a.id, { type: 'reproduce', partnerId: b.id }).ok).toBe(true);
     tickWorld(world, BALANCE.reproductionTicks);
     const children = Object.values(world.citizens).filter((c) => c.parents.length > 0);

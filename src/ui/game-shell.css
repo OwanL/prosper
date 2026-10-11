@@ -1,3 +1,11 @@
+[data-testid='tree-diagnostics'] pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+[data-testid='tree-diagnostics'] li {
+  overflow-wrap: anywhere;
+}
 .game-app {
   --ink: #e3edf0;
   --muted: #9cb0b9;
@@ -538,6 +546,38 @@
 .game-evidence small {
   display: block;
   color: var(--muted);
+}
+/* Composed minds: fixed ten-disposition grid, current task and meaningful memories. */
+.game-dossier .mind-dossier h4 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+}
+.game-dossier .mind-dossier .dispositions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 16px;
+  margin-top: 6px;
+}
+.game-dossier .mind-dossier .dispositions .meter-label {
+  margin: 4px 0;
+}
+.game-dossier .mind-dossier .mind-memories li[data-kind] {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.game-dossier .mind-dossier .mind-memories li[data-kind]::before {
+  content: '◆ ';
+  color: #719d9c;
+}
+/* Marked-tile territories, signs and houses on the scene. */
+.game-app .territory-tiles rect {
+  stroke-linejoin: round;
+}
+.game-app .territory-sign rect {
+  stroke-linejoin: round;
+}
+.game-app .tile-inspector span {
+  display: block;
 }
 .game-app .feed li,
 .game-app .social-dossier,

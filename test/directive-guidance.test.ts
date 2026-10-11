@@ -66,8 +66,8 @@ describe('directive decision guidance', () => {
     expect(text).toContain('Rivalry, companionship, reproduction and influence are live ambitions');
     expect(text).toContain('Do not reflexively split every patch');
     expect(text).toContain('No violence, message or reproduction quota');
-    expect(text).toContain('refusal remains valid');
-    expect(text).toContain('consent can be withdrawn');
+    expect(text).toContain('independent lives and refusal remain valid');
+    expect(text).toContain('no consent is required');
     expect(text).toContain('avoid repetitive status broadcasts');
     expect(text).toContain('Work automatically uses your highest-tier already-carried matching tool');
     expect(text).toContain('work_state_changed');
@@ -80,10 +80,9 @@ describe('directive decision guidance', () => {
       minimumHealthPerParent: BALANCE.reproductionHealth,
       durationTicks: BALANCE.reproductionTicks,
       cooldownTicksPerParent: BALANCE.reproductionCooldown,
-      consentDurationTicks: BALANCE.consentTicks,
     });
-    expect(context.planning.reproduction.consent).toContain('Messages are not consent');
-    expect(context.ownState.consent).toEqual(citizen.consent);
+    expect(context.planning.reproduction).not.toHaveProperty('consent');
+    expect(context.ownState).not.toHaveProperty('consent');
     expect(context.planning.reproduction).not.toHaveProperty('partnerConsent');
   });
 
@@ -136,8 +135,8 @@ describe('directive decision guidance', () => {
       'not forced goals or attacks',
       'No violence, message or reproduction quota',
       'peaceful or solitary choices remain valid',
-      'refusal remains valid',
-      'consent can be withdrawn',
+      'independent lives and refusal remain valid',
+      'no consent is required',
       'You may strategically bluff about your intentions',
       'never fabricate tool outcomes, completed actions, history, holdings',
       "another person's private beliefs",

@@ -15,6 +15,8 @@ afterEach(() => {
 });
 function runtime(directory: string, restore = false) {
   const r = new Runtime({ directory, restore, autoClock: false, autonomy:false });
+  // These fixtures exercise the historical plan executor, not the fresh-world director.
+  if (!restore) r.world.controllerMode = 'legacy';
   runtimes.push(r);
   return r;
 }

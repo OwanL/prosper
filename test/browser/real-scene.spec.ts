@@ -19,6 +19,7 @@ for (const source of paths)
     const snapshot: AppSnapshot = {
       world,
       status: {
+        decisionTreeDebug: false,
         state: 'ready',
         running: false,
         speed: 1,
